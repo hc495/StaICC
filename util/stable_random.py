@@ -17,12 +17,12 @@ class stable_random():
         return self._next() / 2**32
     
     def get_int_from_range(self, start, end):
-        return start + (end - start) * self.get_float()
+        return int(start + (end - start) * self.get_float())
     
     def sample_one_element_from_list(self, list):
         return list[int(self.get_float() * len(list))]
     
-    def sample_n_elements_from_list(self, list, n):
+    def sample_n_elements_from_list(self, list, n, allow_repetition=False):
         if n > len(list):
             raise ValueError("n should be less than the length of the list")
         list_copy = copy.deepcopy(list)
@@ -30,7 +30,8 @@ class stable_random():
         for _ in range(n):
             loca = int(self.get_float() * len(list_copy))
             ret.append(list_copy[loca])
-            list_copy.pop(loca)
+            if not allow_repetition:
+                list_copy.pop(loca)
         return ret
     
     def sample_unique_index_set(self, sample_number, max_index):

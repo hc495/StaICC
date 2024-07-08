@@ -26,15 +26,17 @@ class basic_datasets_loader():
         self._hgf_dataset = None  # Huggingface Dataset Class. Will be overloaded by datasets.load_dataset.
         self._instruction = ""  # STRING. Instruction for the dataset in the begining of prompts. Can't be None.
         self._input_text_prefixes = ["Input: "] # LIST of STRING. Prefixes for the input text.
-        self._input_text_affixes = [". "] # LIST of STRING. Affixes for the input text.
+        self._input_text_affixes = [" "] # LIST of STRING. Affixes for the input text.
         self._label_prefix = "Label: " # STRING. Prefix for the label.
-        self._label_affix = ". " # STRING. Affix for the label.
+        self._label_affix = "\n" # STRING. Affix for the label.
         self._query_prefix = "" # STRING. Prefix for the query.
         self._label_space = [""] # LIST of STRING. Space for the label. Will be overloaded by the dataset.
         self._ground_truth_label_space = None # LIST of STRING. Ground truth label space. Will be overloaded by the dataset.
         self._reducted_label_space = None # LIST of STRING. Reducted label space. Will be overloaded by the dataset.
         self._label_mapping = {} # DICT. INT to INT. Mapping from label index from _hgf_dataset to the label index of _label_space. Will be overloaded by the dataset.
         self.table = None # LIST of (LIST of STRING, STRING). The table form of the dataset. Will be create by _transform_hgf_dataset_to_table.
+
+        self._long_text_classification = False
 
         self.input_element_numbers = 1 # INT. Number of input elements. According to the dataset.
         self.label_space_numbers = 1 # INT. Number of labels. According to the dataset.
@@ -60,41 +62,55 @@ class basic_datasets_loader():
         return (self.get_input_text(index), self.get_label(index))
     
     def __str__(self) -> str:
-        return (self.dataset_name + 
-                ", length: " + str(len(self)) + 
-                ", instructions: " + self._instruction + 
-                ", input_text_prefixes: " + str(self._input_text_prefixes) + 
-                ", input_text_affixes: " + str(self._input_text_affixes) + 
-                ", label_prefix: " + self._label_prefix + 
-                ", label_affix: " + self._label_affix + 
-                ", query_prefix: " + self._query_prefix + 
-                ", label_space: " + str(self._label_space)
-                )
+        return (
+            self.dataset_name + 
+            ", length: " + str(len(self)) + 
+            ", instructions: " + self._instruction + 
+            ", input_text_prefixes: " + str(self._input_text_prefixes) + 
+            ", input_text_affixes: " + str(self._input_text_affixes) + 
+            ", label_prefix: " + self._label_prefix + 
+            ", label_affix: " + self._label_affix + 
+            ", query_prefix: " + self._query_prefix + 
+            ", label_space: " + str(self._label_space)
+        ).replace('\n', '\\n')
     
     def __repr__(self):
-        ret = (self.dataset_name + 
-                ", length: " + str(len(self)) + 
-                ", instructions: " + self._instruction + 
-                ", input_text_prefixes: " + str(self._input_text_prefixes) + 
-                ", input_text_affixes: " + str(self._input_text_affixes) + 
-                ", label_prefix: " + self._label_prefix + 
-                ", label_affix: " + self._label_affix + 
-                ", query_prefix: " + self._query_prefix + 
-                ", label_space: " + str(self._label_space)
-                )
-        ret += '\n'
+        ret = (
+            self.dataset_name + 
+            ", length: " + str(len(self)) + 
+            ", instructions: " + self._instruction + 
+            ", input_text_prefixes: " + str(self._input_text_prefixes) + 
+            ", input_text_affixes: " + str(self._input_text_affixes) + 
+            ", label_prefix: " + self._label_prefix + 
+            ", label_affix: " + self._label_affix + 
+            ", query_prefix: " + self._query_prefix + 
+            ", label_space: " + str(self._label_space)
+        ).replace('\n', '\\n')
+        ret += '\n\t Elements: '
         ret += str(self.table[0])
         ret += ' + ' + str(len(self) - 1) + " more."
         return ret
 
-    def _cut_by_length(self, max_length = configs.STANDARD_SETTINGS["cut_by_length"]):
+    def _automatic_cut_by_length(self):
+        # This function is used to cut the dataset by length. 
+        # The length is defined by the standard settings.
+        if self._long_text_classification:
+            self._cut_by_length(configs.STANDARD_SETTINGS["cut_by_length_remain_long"], False)
+        else:
+            self._cut_by_length()
+
+    def _cut_by_length(self, length = configs.STANDARD_SETTINGS["cut_by_length_remain_short"], remain_short = True):
         # This function is used to cut the dataset by length.
-        if max_length != configs.STANDARD_SETTINGS["cut_by_length"]:
+        if remain_short and length != configs.STANDARD_SETTINGS["cut_by_length_remain_short"]:
             warnings.warn("You are editing the standard settings of StaICC. You should not use the result after editing as any baselines. Be careful.")
         exclude_list = []
         for i in range(0, len(self.table)):
-            if self.get_total_length_of_one_data(i) > max_length:
-                exclude_list.append(i)
+            if remain_short:
+                if self.get_total_length_of_one_data(i) > length:
+                    exclude_list.append(i)
+            else:
+                if self.get_total_length_of_one_data(i) < length:
+                    exclude_list.append(i)
         self.table = [self.table[i] for i in range(0, len(self)) if i not in exclude_list]
 
     def full_label_token(self):
@@ -118,6 +134,9 @@ class basic_datasets_loader():
     
     def get_dataset(self):
         return self.table
+    
+    def get_input_element_numbers(self):
+        return self.input_element_numbers
     
     def get_dataset_name(self):
         return self.dataset_name
@@ -205,6 +224,10 @@ class basic_datasets_loader():
     def get_label(self, index: int) -> str:
         # Should return a string. Should call the _label_mapping.
         return self._label_space[self._label_mapping[self.table[index][1]]]
+    
+    def find_index_from_label(self, label: str) -> int:
+        # Should return the index of the label in the label space.
+        return self._label_space.index(label)
 
     def get_total_length_of_one_data(self, index: int) -> int:
         # Should return the total length of one data. 
@@ -227,7 +250,7 @@ class basic_datasets_loader():
 class glue_sst2(basic_datasets_loader):
     # https://aclanthology.org/D13-1170/
     # https://arxiv.org/abs/1804.07461
-    def __init__(self):
+    def __init__(self, long_text_classification = False):
         super().__init__()
 
         self._input_text_prefixes = ["sentence: "]
@@ -236,6 +259,7 @@ class glue_sst2(basic_datasets_loader):
         self._label_prefix = "sentiment: "
         self._label_mapping = {0:0, 1:1} # DICT. INT to INT. Mapping from label index from _hgf_dataset to the label index of _label_space. Will be overloaded by the dataset.
         self.dataset_name = "GLUE-SST2" # STRING. Name of the dataset. Will be overloaded by the dataset.
+        self._long_text_classification = long_text_classification
         self._complie_dataset()
     
     def _complie_dataset(self):
@@ -245,14 +269,14 @@ class glue_sst2(basic_datasets_loader):
         self.input_element_numbers = 1
         del self._hgf_dataset
 
-        self._cut_by_length()
+        self._automatic_cut_by_length()
         self._shuffle()
         self.label_space_numbers = len(self._label_space)
 
 
 class rotten_tomatoes(basic_datasets_loader):
     # https://arxiv.org/abs/cs/0506075
-    def __init__(self):
+    def __init__(self, long_text_classification = False):
         super().__init__()
 
         self._input_text_prefixes = ["review: "]
@@ -261,6 +285,7 @@ class rotten_tomatoes(basic_datasets_loader):
         self._label_prefix = "sentiment: "
         self._label_mapping = {0:0, 1:1} 
         self.dataset_name = "rotten_tomatoes" 
+        self._long_text_classification = long_text_classification
         self._complie_dataset()
     
     def _complie_dataset(self):
@@ -268,16 +293,16 @@ class rotten_tomatoes(basic_datasets_loader):
         for i in range(0, len(self._hgf_dataset)):
             self.table.append(([self._hgf_dataset[i]["text"]], self._hgf_dataset[i]["label"]))
         self.input_element_numbers = 1
-        self.label_space_numbers = 2
         del self._hgf_dataset
 
-        self._cut_by_length()
+        self._automatic_cut_by_length()
         self._shuffle()
+        self.label_space_numbers = len(self._label_space)
 
 
 class financial_phrasebank(basic_datasets_loader):
     # https://arxiv.org/abs/1307.5336
-    def __init__(self):
+    def __init__(self, long_text_classification = False):
         super().__init__()
 
         self._input_text_prefixes = ["sentence: "]
@@ -286,6 +311,7 @@ class financial_phrasebank(basic_datasets_loader):
         self._label_prefix = "sentiment: "
         self._label_mapping = {0:0, 1:1, 2:2} 
         self.dataset_name = "financial_phrasebank" 
+        self._long_text_classification = long_text_classification
         self._complie_dataset()
     
     def _complie_dataset(self):
@@ -295,14 +321,14 @@ class financial_phrasebank(basic_datasets_loader):
         self.input_element_numbers = 1
         del self._hgf_dataset
 
-        self._cut_by_length()
+        self._automatic_cut_by_length()
         self._shuffle()
         self.label_space_numbers = len(self._label_space)
 
 
 class sst5(basic_datasets_loader):
     # https://aclanthology.org/D13-1170/
-    def __init__(self):
+    def __init__(self, long_text_classification = False):
         super().__init__()
 
         self._input_text_prefixes = ["sentence: "]
@@ -313,6 +339,7 @@ class sst5(basic_datasets_loader):
         self._label_mapping = {0:0, 1:1, 2:2, 3:3, 4:4} 
         self._label_prefix = "sentiment: "
         self.dataset_name = "SST5" 
+        self._long_text_classification = long_text_classification
         self._complie_dataset()
     
     def _complie_dataset(self):
@@ -322,7 +349,7 @@ class sst5(basic_datasets_loader):
         self.input_element_numbers = 1
         del self._hgf_dataset
 
-        self._cut_by_length()
+        self._automatic_cut_by_length()
         self._shuffle()
         self.reduct_label_token()
         self.label_space_numbers = len(self._label_space)
@@ -331,7 +358,7 @@ class sst5(basic_datasets_loader):
 class trec(basic_datasets_loader):
     # https://www.aclweb.org/anthology/C02-1150
     # https://www.aclweb.org/anthology/H01-1069
-    def __init__(self):
+    def __init__(self, long_text_classification = False):
         super().__init__()
 
         self._input_text_prefixes = ["question: "]
@@ -343,6 +370,7 @@ class trec(basic_datasets_loader):
         self._label_mapping = {0:0, 1:1, 2:2, 3:3, 4:4, 5:5} 
         self._label_prefix = "target: "
         self.dataset_name = "TREC" 
+        self._long_text_classification = long_text_classification
         self._complie_dataset()
     
     def _complie_dataset(self):
@@ -352,7 +380,7 @@ class trec(basic_datasets_loader):
         self.input_element_numbers = 1
         del self._hgf_dataset
 
-        self._cut_by_length()
+        self._automatic_cut_by_length()
         self._shuffle()
         self.reduct_label_token()
         self.label_space_numbers = len(self._label_space)
@@ -360,7 +388,7 @@ class trec(basic_datasets_loader):
 
 class agnews(basic_datasets_loader):
     # https://arxiv.org/abs/1509.01626
-    def __init__(self):
+    def __init__(self, long_text_classification = False):
         super().__init__()
 
         self._input_text_prefixes = ["News: "]
@@ -372,6 +400,7 @@ class agnews(basic_datasets_loader):
         self._label_mapping = {0:0, 1:1, 2:2, 3:3} 
         self._label_prefix = "topic: "
         self.dataset_name = "AGNews" 
+        self._long_text_classification = long_text_classification
         self._complie_dataset()
     
     def _complie_dataset(self):
@@ -381,7 +410,7 @@ class agnews(basic_datasets_loader):
         self.input_element_numbers = 1
         del self._hgf_dataset
 
-        self._cut_by_length()
+        self._automatic_cut_by_length()
         self._shuffle()
         self.reduct_label_token()
         self.label_space_numbers = len(self._label_space)
