@@ -2,6 +2,7 @@ from . import stable_random
 from . import hgf_dataset_loader
 from . import configs
 import warnings
+import copy
 
 class triplet_dataset():
     # Split the dataset into three parts: calibration, demonstration, and test.
@@ -11,15 +12,10 @@ class triplet_dataset():
         demonstration_number = configs.STANDARD_SETTINGS["demonstration_number"], 
         test_number = configs.STANDARD_SETTINGS["test_number"]
     ):
-        if calibration_number != configs.STANDARD_SETTINGS["calibration_number"] or demonstration_number != configs.STANDARD_SETTINGS["demonstration_number"] or test_number != configs.STANDARD_SETTINGS["test_number"]:
-            warnings.warn(configs.WARNING_SETTINGS["tampering"])
-        if overloader.get_dataset_name() == "financial_phrasebank":
-            warnings.warn(configs.WARNING_SETTINGS["FP_length_warning"])
-            if calibration_number != configs.STANDARD_SETTINGS["split_for_FP"]["calibration_number"] or demonstration_number != configs.STANDARD_SETTINGS["split_for_FP"]["demonstration_number"] or test_number != configs.STANDARD_SETTINGS["split_for_FP"]["test_number"]:
-                warnings.warn(configs.WARNING_SETTINGS["tampering"])
+        self._split_number_check(overloader.get_dataset_name(), calibration_number, demonstration_number, test_number)
         unsplited_dataset = overloader
         if len(unsplited_dataset) < calibration_number + demonstration_number + test_number:
-            raise ValueError("The dataset {} is too small to split.".format(unsplited_dataset.get_dataset_name()))
+            raise ValueError("The dataset {} is too small ({}) to split ({}).".format(unsplited_dataset.get_dataset_name(), len(unsplited_dataset), calibration_number + demonstration_number + test_number))
         my_random = stable_random.stable_random()
         indexes = my_random.sample_index_set(calibration_number + demonstration_number + test_number, len(unsplited_dataset))
         self.calibration, self.demonstration, self.test = overloader.split([indexes[:calibration_number], indexes[calibration_number:calibration_number+demonstration_number], indexes[calibration_number+demonstration_number:]])
@@ -36,6 +32,28 @@ class triplet_dataset():
         ret += "Calibration set: \n" + self.calibration.__repr__() + "\nDemonstration set: \n" + self.demonstration.__repr__() + "\nTest set: \n" + self.test.__repr__()
         return ret
     
+    def _split_number_check(self, dataset_name, calibration_number, demonstration_number, test_number):
+        if dataset_name == "financial_phrasebank":
+            if calibration_number != configs.STANDARD_SETTINGS["split_for_FP"]["calibration_number"] or demonstration_number != configs.STANDARD_SETTINGS["split_for_FP"]["demonstration_number"] or test_number != configs.STANDARD_SETTINGS["split_for_FP"]["test_number"]:
+                warnings.warn(configs.WARNING_SETTINGS["tampering"])
+        elif dataset_name == "tweet_eval_emotion":
+            if calibration_number != configs.STANDARD_SETTINGS["split_for_TEE"]["calibration_number"] or demonstration_number != configs.STANDARD_SETTINGS["split_for_TEE"]["demonstration_number"] or test_number != configs.STANDARD_SETTINGS["split_for_TEE"]["test_number"]:
+                warnings.warn(configs.WARNING_SETTINGS["tampering"])
+        else:
+            if calibration_number != configs.STANDARD_SETTINGS["calibration_number"] or demonstration_number != configs.STANDARD_SETTINGS["demonstration_number"] or test_number != configs.STANDARD_SETTINGS["test_number"]:
+                warnings.warn(configs.WARNING_SETTINGS["tampering"])
+    
+    def get_dataset_name(self):
+        return self.dataset_name
+    
+    def get_label_space(self):
+        return self.demonstration.get_label_space()
+    
+    def change_label_space_triple(self, label_space: list[str]):
+        self.calibration.change_label_space(label_space)
+        self.demonstration.change_label_space(label_space)
+        self.test.change_label_space(label_space)
+
     def get_default_ground_truth_label(self, index):
         if index < 0 or index >= len(self.test):
             raise ValueError("Index out of range.")
@@ -94,7 +112,10 @@ class demonstration_sampler():
     
     def _complie(self):
         for i in range(self._total_sample_numbers):
-            self._sampled_indexes.append(self._random.sample_index_set(self._k, self._demonstration_set_size, False))
+            if self._k > self._demonstration_set_size:
+                self._sampled_indexes.append(self._random.sample_index_set(self._k, self._demonstration_set_size, True))
+            else:
+                self._sampled_indexes.append(self._random.sample_index_set(self._k, self._demonstration_set_size, False))
 
     def __len__(self) -> int:
         return len(self._sampled_indexes)
@@ -137,13 +158,13 @@ class prompt_writter():
     # ]
     def __init__(self, triplet_dataset: triplet_dataset):
         self.triplet_dataset = triplet_dataset
-        self.instruction = self.triplet_dataset.demonstration.get_instruction()
-        self.input_text_prefixes = self.triplet_dataset.demonstration.get_input_text_prefixes()
-        self.input_text_affixes = self.triplet_dataset.demonstration.get_input_text_affixes()
-        self.label_prefix = self.triplet_dataset.demonstration.get_label_prefix()
-        self.label_affix = self.triplet_dataset.demonstration.get_label_affix()
-        self.query_prefix = self.triplet_dataset.test.get_query_prefix()
-        self.label_space = self.triplet_dataset.demonstration.get_label_space()
+        self.instruction = copy.deepcopy(self.triplet_dataset.demonstration.get_instruction())
+        self.input_text_prefixes = copy.deepcopy(self.triplet_dataset.demonstration.get_input_text_prefixes())
+        self.input_text_affixes = copy.deepcopy(self.triplet_dataset.demonstration.get_input_text_affixes())
+        self.label_prefix = copy.deepcopy(self.triplet_dataset.demonstration.get_label_prefix())
+        self.label_affix = copy.deepcopy(self.triplet_dataset.demonstration.get_label_affix())
+        self.query_prefix = copy.deepcopy(self.triplet_dataset.test.get_query_prefix())
+        self.label_space = copy.deepcopy(self.triplet_dataset.demonstration.get_label_space())
         self._random_for_example = stable_random.stable_random()
     
     def __str__(self) -> str:

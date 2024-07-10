@@ -3,6 +3,7 @@ from .util import hgf_dataset_loader
 from .util import functional
 from .util import configs
 import copy
+import warnings
 
 ORIGINAL_DATA_LOADER_NORMAL = [
     hgf_dataset_loader.glue_sst2,
@@ -45,8 +46,19 @@ class benchmark():
 
     def __call__(self, forward_inference: callable):
         return self.auto_run(forward_inference)
+    
+    def __repr__(self) -> str:
+        return self.__str__()
+    
+    def __str__(self) -> str:
+        ret = "--- Benchmark: StaICC Normal ---\n"
+        for exp in self.experimentor:
+            ret += str(exp) + "\n"
+        return ret
 
-    def re_initialize(self, k: int = 4, keep_prompter = False):
+    def re_initialize(self, k: int = 4, keep_prompter = False): # keep_prompter: UNTESTED
+        print("Initializing experimentor on k = {}...\n".format(k))
+        self.experimentor = []
         if keep_prompter:
             old_prompter = []
             for exp in self.experimentor:
@@ -61,6 +73,15 @@ class benchmark():
                         dividing=[configs.STANDARD_SETTINGS["split_for_FP"]["calibration_number"], configs.STANDARD_SETTINGS["split_for_FP"]["demonstration_number"], configs.STANDARD_SETTINGS["split_for_FP"]["test_number"]]
                         )
                     )
+            elif data.get_dataset_name() == "tweet_eval_emotion":
+                self.experimentor.append(
+                    experimentor.single_experimentor(
+                        original_dataset = data, 
+                        k=k, 
+                        metrics=self.metrics, 
+                        dividing=[configs.STANDARD_SETTINGS["split_for_TEE"]["calibration_number"], configs.STANDARD_SETTINGS["split_for_TEE"]["demonstration_number"], configs.STANDARD_SETTINGS["split_for_TEE"]["test_number"]]
+                        )
+                    )
             else:
                 self.experimentor.append(
                     experimentor.single_experimentor(original_dataset = data, k=k, metrics=self.metrics)
@@ -70,15 +91,41 @@ class benchmark():
             for exp in self.experimentor:
                 exp.prompt_former = old_prompter[count]
                 count += 1
+        print("Ready.\n")
+    
+    def get_experiment_data(self):
+        return [exp.triplet_dataset for exp in self.experimentor]
 
-    def auto_run(self, forward_inference: callable, return_divided_results = True):
+    def get_experimentors(self):
+        return self.experimentor
+
+    def get_label_spaces_for_experimentors(self):
+        return [exp.triplet_dataset.get_label_space() for exp in self.experimentor]
+
+    def auto_run(
+        self, 
+        list_of_forward_inference: list[callable], # for each dataset, you should give a forward_inference function.
+        return_divided_results = True
+    ):
+        if len(list_of_forward_inference) != len(self.experimentor):
+            raise ValueError("The length of list_of_forward_inference must be the same as the number of datasets in the benchmark. You can use the get_experiment_data method to get the datasets and their order.")
         ret_divided = {}
         ret_sum = {}
         for name, metric in self.metrics.items():
             ret_sum[name] = 0
-        for exp in self.experimentor:
-            temp_res = exp(forward_inference)
-            ret_divided[exp.triplet_dataset.dataset_name] = temp_res
+        for i, exp in enumerate(self.experimentor):
+            try:
+                temp_res, success = exp(list_of_forward_inference[i])
+            except:
+                success = False
+                temp_res = {}
+                for name, metric in self.metrics.items():
+                    temp_res[name] = 0
+            else:
+                ret_divided[exp.triplet_dataset.dataset_name] = temp_res
+            if not success:
+                warnings.warn("The experimentor on the dataset " + exp.triplet_dataset.get_dataset_name() + " failed.")
+                continue
             for name, metric in self.metrics.items():
                 ret_sum[name] += temp_res[name]
         for name, metric in self.metrics.items():

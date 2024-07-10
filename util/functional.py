@@ -25,7 +25,7 @@ def linspace(start, end, num):
     return [start + (end - start) * i / (num - 1) for i in range(num)]
     
 def extend_onehot_prediction_to_logits(prediction: list[int]) -> list[list[float]]:
-    if type(prediction) == list[list[float]]:
+    if type(prediction[0]) == list:
         return prediction
     if not all([0 <= x < len(prediction) for x in prediction]):
         raise ValueError("The prediction should be in the range of [0, len(prediction)).")
@@ -77,8 +77,6 @@ def macro_F1(ground_truth: list[int], prediction):
     return sum(F1) / len(F1)
 
 def expected_calibration_error_1(ground_truth: list[int], prediction, bins = configs.STANDARD_SETTINGS["ece_bins"]):
-    if type(prediction) == list[int]:
-        return -1
     if len(ground_truth) != len(prediction):
         raise ValueError("The length of ground_truth and prediction should be the same.")
     if not all([all([0 <= y <= 1 for y in x]) for x in prediction]):

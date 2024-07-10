@@ -36,8 +36,6 @@ class single_experimentor():
             self.triplet_dataset = triplet_dataset
         if original_dataset is not None:
             self.triplet_dataset = dataset_interface.triplet_dataset(original_dataset, dividing[0], dividing[1], dividing[2])
-        if k > len(self.triplet_dataset.demonstration):
-            raise ValueError("k should be less than the length of the demonstration dataset.")
         
         self.prompt_former = dataset_interface.prompt_writter(self.triplet_dataset)
         self._demonstration_sampler = dataset_interface.demonstration_sampler(self._k, len(self.triplet_dataset.demonstration), repeat_times * len(self.triplet_dataset.test))
@@ -90,7 +88,14 @@ class single_experimentor():
         # The forward_inference function should be a callable that takes a prompt and returns a list of label logits or a label index.
         # We encourage the forward_inference function to be a function that takes a prompt and returns a list of logits for each label, so that we can calculate more metrics.
         # >> If you use a function that returns a label index, the metrics that require logits will be calculated as if the logits are one-hot encoded.
-        print("Start testing the forward inference function " + str(forward_inference) + " on the dataset: " + str(self.triplet_dataset.test.dataset_name))
+        print("\nStart testing the forward inference function " + str(forward_inference) + " on the dataset: " + str(self.triplet_dataset.test.dataset_name))
+        success = False
+        if self._k > len(self.triplet_dataset.demonstration):
+            warnings.warn("The k value is larger than the length of the demonstration dataset. Return all-0 results.")
+            ret = {}
+            for metric_name, metric_function in self.metrics.items():
+                ret[metric_name] = 0
+            return ret, success
         ground_truth = []
         prediction = []
         total_samples = len(self.triplet_dataset.test) * self._repeat_times
@@ -109,7 +114,8 @@ class single_experimentor():
         ret = {}
         for metric_name, metric_function in self.metrics.items():
             ret[metric_name] = metric_function(ground_truth, functional.extend_onehot_prediction_to_logits(prediction))
-        return ret
+        success = True
+        return ret, success
     
     def calibration_set(self):
         return self.triplet_dataset.calibration

@@ -11,8 +11,13 @@ STANDARD_SETTINGS = {
     "random_B": 1013904223,
     "random_C": 2**32,
     "split_for_FP": {
-        "calibration_number": 512,
-        "demonstration_number": 1024,
+        "calibration_number": 1024,
+        "demonstration_number": 512,
+        "test_number": 512
+    },
+    "split_for_TEE": {
+        "calibration_number": 1024,
+        "demonstration_number": 3192,
         "test_number": 512
     },
 }

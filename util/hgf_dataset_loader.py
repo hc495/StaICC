@@ -219,9 +219,6 @@ class basic_datasets_loader():
         self._query_prefix = query_prefix
 
     def change_label_space(self, label_space: list[str]):
-        if configs.STRICT_MODE:
-            warnings.warn(configs.WARNING_SETTINGS["basic_dataset_template_protect"])
-            return
         warnings.warn(configs.WARNING_SETTINGS["tampering"])
         if type(label_space) is not list:
             raise ValueError("Label space should be a list.")
@@ -358,7 +355,7 @@ class sst5(basic_datasets_loader):
     def _complie_dataset(self):
         self.table = []
         for i in range(0, len(self._hgf_dataset)):
-            self.table.append(([self._hgf_dataset[i]["sentence"]], self._hgf_dataset[i]["label"]))
+            self.table.append(([self._hgf_dataset[i]["text"]], self._hgf_dataset[i]["label"]))
         self.input_element_numbers = 1
         del self._hgf_dataset
 
