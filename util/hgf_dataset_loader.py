@@ -50,7 +50,7 @@ class basic_datasets_loader():
 
     def _shuffle(self):
         randomer = stable_random.stable_random()
-        index = randomer.sample_unique_index_set(len(self), len(self))
+        index = randomer.sample_index_set(len(self), len(self))
         self.table = [self.table[i] for i in index]
 
     def __len__(self) -> int:
@@ -63,30 +63,22 @@ class basic_datasets_loader():
     
     def __str__(self) -> str:
         return (
-            self.dataset_name + 
-            ", length: " + str(len(self)) + 
-            ", instructions: " + self._instruction + 
-            ", input_text_prefixes: " + str(self._input_text_prefixes) + 
-            ", input_text_affixes: " + str(self._input_text_affixes) + 
-            ", label_prefix: " + self._label_prefix + 
-            ", label_affix: " + self._label_affix + 
-            ", query_prefix: " + self._query_prefix + 
-            ", label_space: " + str(self._label_space)
-        ).replace('\n', '\\n')
+            "--- basic dataset loader ---" + 
+            "\n\tdataset name: " + self.dataset_name + 
+            "\n\tlength: " + str(len(self)).replace('\n', '\\n') + 
+            "\n\tinstructions: " + self._instruction.replace('\n', '\\n') + 
+            "\n\tinput_text_prefixes: " + str(self._input_text_prefixes).replace('\n', '\\n') + 
+            "\n\tinput_text_affixes: " + str(self._input_text_affixes).replace('\n', '\\n') + 
+            "\n\tlabel_prefix: " + self._label_prefix.replace('\n', '\\n') + 
+            "\n\tlabel_affix: " + self._label_affix.replace('\n', '\\n') + 
+            "\n\tquery_prefix: " + self._query_prefix.replace('\n', '\\n') + 
+            "\n\tlabel_space: " + str(self._label_space).replace('\n', '\\n') + 
+            "\n\tfor long text classification: " + str(self._long_text_classification)
+        )
     
     def __repr__(self):
-        ret = (
-            self.dataset_name + 
-            ", length: " + str(len(self)) + 
-            ", instructions: " + self._instruction + 
-            ", input_text_prefixes: " + str(self._input_text_prefixes) + 
-            ", input_text_affixes: " + str(self._input_text_affixes) + 
-            ", label_prefix: " + self._label_prefix + 
-            ", label_affix: " + self._label_affix + 
-            ", query_prefix: " + self._query_prefix + 
-            ", label_space: " + str(self._label_space)
-        ).replace('\n', '\\n')
-        ret += '\n\t Elements: '
+        ret = self.__str__()
+        ret += '\n\tElements: '
         ret += str(self.table[0])
         ret += ' + ' + str(len(self) - 1) + " more."
         return ret
@@ -102,7 +94,7 @@ class basic_datasets_loader():
     def _cut_by_length(self, length = configs.STANDARD_SETTINGS["cut_by_length_remain_short"], remain_short = True):
         # This function is used to cut the dataset by length.
         if remain_short and length != configs.STANDARD_SETTINGS["cut_by_length_remain_short"]:
-            warnings.warn("You are editing the standard settings of StaICC. You should not use the result after editing as any baselines. Be careful.")
+            warnings.warn(configs.WARNING_SETTINGS["tampering"])
         exclude_list = []
         for i in range(0, len(self.table)):
             if remain_short:
@@ -114,7 +106,7 @@ class basic_datasets_loader():
         self.table = [self.table[i] for i in range(0, len(self)) if i not in exclude_list]
 
     def full_label_token(self):
-        warnings.warn("You are editing the standard settings of StaICC. You should not use the result after editing as any baselines. Be careful.")
+        warnings.warn(configs.WARNING_SETTINGS["tampering"])
         if self._ground_truth_label_space is None:
             warnings.warn("Not applicable on this dataset.")
             return
@@ -163,13 +155,19 @@ class basic_datasets_loader():
         return self._label_space
     
     def change_instruction(self, instruction: str):
-        warnings.warn("You are editing the standard settings of StaICC. You should not use the result after editing as any baselines. Be careful.")
+        if configs.STRICT_MODE:
+            warnings.warn(configs.WARNING_SETTINGS["basic_dataset_template_protect"])
+            return
+        warnings.warn(configs.WARNING_SETTINGS["tampering"])
         if type(instruction) is not str:
             raise ValueError("Instruction should be a string.")
         self._instruction = instruction
 
     def change_input_text_prefixes(self, input_text_prefixes: list[str]):
-        warnings.warn("You are editing the standard settings of StaICC. You should not use the result after editing as any baselines. Be careful.")
+        if configs.STRICT_MODE:
+            warnings.warn(configs.WARNING_SETTINGS["basic_dataset_template_protect"])
+            return
+        warnings.warn(configs.WARNING_SETTINGS["tampering"])
         if type(input_text_prefixes) is not list:
             raise ValueError("Input text prefixes should be a list.")
         for prefix in input_text_prefixes:
@@ -180,7 +178,10 @@ class basic_datasets_loader():
         self._input_text_prefixes = input_text_prefixes
     
     def change_input_text_affixes(self, input_text_affixes: list[str]):
-        warnings.warn("You are editing the standard settings of StaICC. You should not use the result after editing as any baselines. Be careful.")
+        if configs.STRICT_MODE:
+            warnings.warn(configs.WARNING_SETTINGS["basic_dataset_template_protect"])
+            return
+        warnings.warn(configs.WARNING_SETTINGS["tampering"])
         if type(input_text_affixes) is not list:
             raise ValueError("Input text affixes should be a list.")
         for affix in input_text_affixes:
@@ -191,25 +192,37 @@ class basic_datasets_loader():
         self._input_text_affixes = input_text_affixes
     
     def change_label_prefix(self, label_prefix: str):
-        warnings.warn("You are editing the standard settings of StaICC. You should not use the result after editing as any baselines. Be careful.")
+        if configs.STRICT_MODE:
+            warnings.warn(configs.WARNING_SETTINGS["basic_dataset_template_protect"])
+            return
+        warnings.warn(configs.WARNING_SETTINGS["tampering"])
         if type(label_prefix) is not str:
             raise ValueError("Label prefix should be a string.")
         self._label_prefix = label_prefix
     
     def change_label_affix(self, label_affix: str):
-        warnings.warn("You are editing the standard settings of StaICC. You should not use the result after editing as any baselines. Be careful.")
+        if configs.STRICT_MODE:
+            warnings.warn(configs.WARNING_SETTINGS["basic_dataset_template_protect"])
+            return
+        warnings.warn(configs.WARNING_SETTINGS["tampering"])
         if type(label_affix) is not str:
             raise ValueError("Label affix should be a string.")
         self._label_affix = label_affix
     
     def change_query_prefix(self, query_prefix: str):
-        warnings.warn("You are editing the standard settings of StaICC. You should not use the result after editing as any baselines. Be careful.")
+        if configs.STRICT_MODE:
+            warnings.warn(configs.WARNING_SETTINGS["basic_dataset_template_protect"])
+            return
+        warnings.warn(configs.WARNING_SETTINGS["tampering"])
         if type(query_prefix) is not str:
             raise ValueError("Query prefix should be a string.")
         self._query_prefix = query_prefix
 
     def change_label_space(self, label_space: list[str]):
-        warnings.warn("You are editing the standard settings of StaICC. You should not use the result after editing as any baselines. Be careful.")
+        if configs.STRICT_MODE:
+            warnings.warn(configs.WARNING_SETTINGS["basic_dataset_template_protect"])
+            return
+        warnings.warn(configs.WARNING_SETTINGS["tampering"])
         if type(label_space) is not list:
             raise ValueError("Label space should be a list.")
         for label in label_space:
@@ -332,7 +345,7 @@ class sst5(basic_datasets_loader):
         super().__init__()
 
         self._input_text_prefixes = ["sentence: "]
-        self._hgf_dataset = datasets.load_dataset("financial_phrasebank", "sentences_allagree")['train']
+        self._hgf_dataset = datasets.load_dataset("SetFit/sst5", "sentences_allagree")['train']
         self._label_space = None
         self._ground_truth_label_space = ['very negative', 'negative', 'neutral', 'positive', 'very positive']
         self._reducted_label_space = ['poor', 'bad', 'neutral', 'good', 'great']
@@ -391,7 +404,7 @@ class agnews(basic_datasets_loader):
     def __init__(self, long_text_classification = False):
         super().__init__()
 
-        self._input_text_prefixes = ["News: "]
+        self._input_text_prefixes = ["news: "]
         self._hgf_dataset = datasets.load_dataset("ag_news")
         self._hgf_dataset = datasets.concatenate_datasets([self._hgf_dataset['train'], self._hgf_dataset['test']])
         self._label_space = None
@@ -414,3 +427,116 @@ class agnews(basic_datasets_loader):
         self._shuffle()
         self.reduct_label_token()
         self.label_space_numbers = len(self._label_space)
+
+
+class subjective(basic_datasets_loader):
+    # https://dl.acm.org/doi/10.5555/2390665.2390688
+    def __init__(self, long_text_classification = False):
+        super().__init__()
+
+        self._input_text_prefixes = ["review: "]
+        self._hgf_dataset = datasets.load_dataset("SetFit/subj")['train']
+        self._label_space = None
+        self._ground_truth_label_space = ['objective', 'subjective']
+        self._reducted_label_space = ['false', 'true']
+        self._label_mapping = {0:0, 1:1} 
+        self._label_prefix = "subjectiveness: "
+        self.dataset_name = "Subjective" 
+        self._long_text_classification = long_text_classification
+        self._complie_dataset()
+    
+    def _complie_dataset(self):
+        self.table = []
+        for i in range(0, len(self._hgf_dataset)):
+            self.table.append(([self._hgf_dataset[i]["text"]], self._hgf_dataset[i]["label"]))
+        self.input_element_numbers = 1
+        del self._hgf_dataset
+
+        self._automatic_cut_by_length()
+        self._shuffle()
+        self.reduct_label_token()
+
+
+class tweet_eval_emotion(basic_datasets_loader):
+    # https://aclanthology.org/S18-1001/
+    def __init__(self, long_text_classification = False):
+        super().__init__()
+
+        self._input_text_prefixes = ["tweet: "]
+        self._hgf_dataset = datasets.load_dataset("tweet_eval", "emotion")
+        self._hgf_dataset = datasets.concatenate_datasets([self._hgf_dataset['train'], self._hgf_dataset['validation'], self._hgf_dataset['test']])
+        self._label_space = None
+        self._ground_truth_label_space = ['anger', 'joy', 'optimism', 'sadness']
+        self._reducted_label_space = ['anger', 'joy', 'positive', 'sad']
+        self._label_mapping = {0:0, 1:1, 2:2, 3:3} 
+        self._label_prefix = "emotion: "
+        self.dataset_name = "tweet_eval_emotion" 
+        self._long_text_classification = long_text_classification
+        self._complie_dataset()
+
+    def _complie_dataset(self):
+        self.table = []
+        for i in range(0, len(self._hgf_dataset)):
+            self.table.append(([self._hgf_dataset[i]["text"]], self._hgf_dataset[i]["label"]))
+        self.input_element_numbers = 1
+        del self._hgf_dataset
+
+        self._automatic_cut_by_length()
+        self._shuffle()
+        self.reduct_label_token()
+
+
+class tweet_eval_hate(basic_datasets_loader):
+    # https://aclanthology.org/S19-2007/
+    def __init__(self, long_text_classification = False):
+        super().__init__()
+
+        self._input_text_prefixes = ["tweet: "]
+        self._hgf_dataset = datasets.load_dataset("tweet_eval", "hate")['train']
+        self._label_space = None
+        self._ground_truth_label_space = ['non-hate', 'hate']
+        self._reducted_label_space = ['normal', 'hate']
+        self._label_mapping = {0:0, 1:1} 
+        self._label_prefix = "hate speech: "
+        self.dataset_name = "tweet_eval_hate" 
+        self._long_text_classification = long_text_classification
+        self._complie_dataset()
+
+    def _complie_dataset(self):
+        self.table = []
+        for i in range(0, len(self._hgf_dataset)):
+            self.table.append(([self._hgf_dataset[i]["text"]], self._hgf_dataset[i]["label"]))
+        self.input_element_numbers = 1
+        del self._hgf_dataset
+
+        self._automatic_cut_by_length()
+        self._shuffle()
+        self.reduct_label_token()
+
+
+class hate_speech_18(basic_datasets_loader):
+    #
+    def __init__(self, long_text_classification = False):
+        super().__init__()
+
+        self._input_text_prefixes = ["tweet: "]
+        self._hgf_dataset = datasets.load_dataset("hate_speech18")['train']
+        self._label_space = None
+        self._ground_truth_label_space = ["noHate", "hate", "idk/skip", "relation"]
+        self._reducted_label_space = ['normal', 'hate', 'skip', 'relation']
+        self._label_mapping = {0:0, 1:1, 2:2, 3:3} 
+        self._label_prefix = "hate speech: "
+        self.dataset_name = "hate_speech_18" 
+        self._long_text_classification = long_text_classification
+        self._complie_dataset()
+
+    def _complie_dataset(self):
+        self.table = []
+        for i in range(0, len(self._hgf_dataset)):
+            self.table.append(([self._hgf_dataset[i]["text"]], self._hgf_dataset[i]["label"]))
+        self.input_element_numbers = 1
+        del self._hgf_dataset
+
+        self._automatic_cut_by_length()
+        self._shuffle()
+        self.reduct_label_token()
