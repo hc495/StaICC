@@ -10,13 +10,16 @@ class triplet_dataset():
         overloader: hgf_dataset_loader.basic_datasets_loader, 
         calibration_number = configs.STANDARD_SETTINGS["calibration_number"], 
         demonstration_number = configs.STANDARD_SETTINGS["demonstration_number"], 
-        test_number = configs.STANDARD_SETTINGS["test_number"]
+        test_number = configs.STANDARD_SETTINGS["test_number"],
+        random_seed = configs.STANDARD_SETTINGS["random_seed"]
     ):
+        if random_seed != configs.STANDARD_SETTINGS["random_seed"]:
+            warnings.warn(configs.WARNING_SETTINGS["tampering"])
         self._split_number_check(overloader.get_dataset_name(), calibration_number, demonstration_number, test_number)
         unsplited_dataset = overloader
         if len(unsplited_dataset) < calibration_number + demonstration_number + test_number:
             raise ValueError("The dataset {} is too small ({}) to split ({}).".format(unsplited_dataset.get_dataset_name(), len(unsplited_dataset), calibration_number + demonstration_number + test_number))
-        my_random = stable_random.stable_random()
+        my_random = stable_random.stable_random(random_seed)
         indexes = my_random.sample_index_set(calibration_number + demonstration_number + test_number, len(unsplited_dataset))
         self.calibration, self.demonstration, self.test = overloader.split([indexes[:calibration_number], indexes[calibration_number:calibration_number+demonstration_number], indexes[calibration_number+demonstration_number:]])
         self.dataset_name = overloader.get_dataset_name()

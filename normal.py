@@ -104,19 +104,26 @@ class benchmark():
 
     def auto_run(
         self, 
-        list_of_forward_inference: list[callable], # for each dataset, you should give a forward_inference function.
+        list_of_forward_inference: list[callable], # for each dataset, you should give a forward_inference function. If you just give one, we will expand it to the length of the benchmark.
         return_divided_results = True
     ):
+        count = 0
         if len(list_of_forward_inference) != len(self.experimentor):
-            raise ValueError("The length of list_of_forward_inference must be the same as the number of datasets in the benchmark. You can use the get_experiment_data method to get the datasets and their order.")
+            if len(list_of_forward_inference) == 1:
+                list_of_forward_inference = list_of_forward_inference * len(self.experimentor)
+            else:
+                raise ValueError("The length of list_of_forward_inference must be the same as the number of datasets in the benchmark. You can use the get_experiment_data method to get the datasets and their order.")
         ret_divided = {}
         ret_sum = {}
         for name, metric in self.metrics.items():
             ret_sum[name] = 0
         for i, exp in enumerate(self.experimentor):
+            count += 1
+            print("\n\nExperiment {} in {}".format(count, len(self._default_data)))
             try:
                 temp_res, success = exp(list_of_forward_inference[i])
-            except:
+            except Exception as r:
+                print(r)
                 success = False
                 temp_res = {}
                 for name, metric in self.metrics.items():

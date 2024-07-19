@@ -6,8 +6,10 @@ def exp_to_list(list):
     return [math.exp(x) for x in list]
 
 def softmax(x):
-    f_x = exp_to_list(x) 
-    sum_x = sum(exp_to_list(x))
+    f_x_max = max(x)
+    f_x = [x_i - f_x_max for x_i in x]
+    f_x = exp_to_list(f_x) 
+    sum_x = sum(f_x)
     return [x_i / sum_x for x_i in f_x]
 
 def argmax(x):

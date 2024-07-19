@@ -67,6 +67,12 @@ class single_experimentor():
     def reset_demonstration_sampler(self):
         self._demonstration_sampler = copy.deepcopy(self._default_demonstration_sampler)
         self._repeat_times = self._default_repeat_times
+
+    def get_prompt_writter_from_dataline(self):
+        return self.prompt_former.write_prompt_from_dataline
+
+    def get_label_space(self):
+        return self.triplet_dataset.get_label_space()
     
     def set_demonstration_sampler(self, sampler):
         # The sampler can be a list-shaped list of integers. 
@@ -83,7 +89,7 @@ class single_experimentor():
 
     def auto_run(
         self, 
-        forward_inference: callable # forward_inference: (prompt: str) -> list[float] <logits> or int <label>
+        forward_inference: callable # forward_inference: (prompt: str, label_space: list[str]) -> list[float] <logits> or int <label>. The inputted parameter signs are fixed to prompt and label_space.
     ):
         # The forward_inference function should be a callable that takes a prompt and returns a list of label logits or a label index.
         # We encourage the forward_inference function to be a function that takes a prompt and returns a list of logits for each label, so that we can calculate more metrics.
@@ -102,7 +108,7 @@ class single_experimentor():
         for time in range(self._repeat_times):
             for index in range(len(self.triplet_dataset.test)):
                 prompt = self._get_prompts_for_test_sample(index, time)
-                result = forward_inference(prompt)
+                result = forward_inference(prompt = prompt, label_space = self.triplet_dataset.get_label_space()) # The inputted parameter signs are fixed to prompt and label_space.
                 ground_truth.append(self.triplet_dataset.get_default_ground_truth_label_index(index))
                 prediction.append(result)
                 print("\r", end="")
