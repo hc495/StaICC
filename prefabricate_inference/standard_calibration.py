@@ -14,7 +14,9 @@ class calibration():
     def __call__(self, label_space_prob, full_vocab_prob, hidden_state) -> list[float]:
         return self.inference(label_space_prob, full_vocab_prob, hidden_state)
 
+
 class contextual_calibration(calibration):
+    # https://arxiv.org/abs/2102.09690
     def __init__(self, label_space) -> None:
         self.label_space = label_space
         n_label = len(label_space)
@@ -24,7 +26,7 @@ class contextual_calibration(calibration):
     def train(
         self, 
         default_prompt_maker: callable, # input: demos_lines: <list[(list[str], str)]>, query_line: <list[str]> return: prompt, recommendation: prompt_writter.write_prompt_from_dataline
-        feedforward: callable, # feedforward function, input: prompt: <str> return: label_space_prob, full_vocab_prob, hidden_state
+        feedforward: callable, # feedforward function, input: prompt: <str> return: label_space_prob
         calibration_set = None,
         calibration_number = 128,
         k = 4
@@ -41,7 +43,9 @@ class contextual_calibration(calibration):
     def inference(self, label_space_prob, full_vocab_prob, hidden_state) -> list[float]:
         return functional.softmax([label_space_prob[j] / self.calibrationA[j] for j in range(self.n_label)])
 
+
 class domain_calibration(calibration):
+    # https://arxiv.org/abs/2305.19148
     def __init__(self, label_space) -> None:
         self.label_space = label_space
         n_label = len(label_space)
@@ -66,7 +70,7 @@ class domain_calibration(calibration):
     def train(
         self, 
         default_prompt_maker: callable, # input: demos_lines: <list[(list[str], str)]>, query_line: <list[str]> return: prompt, recommendation: prompt_writter.write_prompt_from_dataline
-        feedforward: callable, # feedforward function, input: prompt: <str> return: label_space_prob, full_vocab_prob, hidden_state
+        feedforward: callable, # feedforward function, input: prompt: <str> return: label_space_prob
         calibration_set = None,
         calibration_number = 128,
         sample_length = 64,
