@@ -88,3 +88,31 @@ class domain_calibration(calibration):
     
     def inference(self, label_space_prob, full_vocab_prob, hidden_state) -> list[float]:
         return functional.softmax([label_space_prob[j] / self.calibrationA[j] for j in range(self.n_label)])
+    
+
+def batch_calibration(
+    label_space_probs: list[list[float]], 
+    batch_size = 128, 
+) -> list[list[float]]:
+    ret = []
+    step = len(label_space_probs) // batch_size
+    for i in range(step):
+        batch = label_space_probs[i * batch_size: (i + 1) * batch_size]
+        mean_bias = [0] * len(batch[0])
+        for j in range(batch_size):
+            for k in range(len(batch[j])):
+                mean_bias[k] += batch[j][k]
+        mean_bias = [x / batch_size for x in mean_bias]
+        for j in range(batch_size):
+            ret.append(functional.softmax([batch[j][k] - mean_bias[k] for k in range(len(batch[j]))]))
+    last_batch = label_space_probs[step * batch_size:]
+    if len(last_batch) == 0:
+        return ret
+    mean_bias = [0] * len(last_batch[0])
+    for j in range(len(last_batch)):
+        for k in range(len(last_batch[j])):
+            mean_bias[k] += last_batch[j][k]
+    mean_bias = [x / len(last_batch) for x in mean_bias]
+    for j in range(len(last_batch)):
+        ret.append(functional.softmax([last_batch[j][k] - mean_bias[k] for k in range(len(last_batch[j]))]))
+    return ret

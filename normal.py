@@ -22,6 +22,7 @@ class benchmark():
     def __init__(
         self, 
         k = 4,
+        noisy_channel = False,
         metrics: dict = {
             "accuracy": functional.accuracy,
             "averaged_truelabel_likelihood": functional.averaged_truelabel_likelihood,
@@ -41,11 +42,12 @@ class benchmark():
 
         print("Data loaded successfully.\n")
         self.metrics = metrics
+        self.noisy_channel = noisy_channel
 
-        self.re_initialize(k)
+        self.re_initialize(k = k, noisy_channel = self.noisy_channel)
 
-    def __call__(self, forward_inference: callable):
-        return self.auto_run(forward_inference)
+    def __call__(self, forward_inference: callable, return_divided_results = True, batched_inference = False):
+        return self.auto_run(forward_inference, return_divided_results, batched_inference)
     
     def __repr__(self) -> str:
         return self.__str__()
@@ -56,7 +58,7 @@ class benchmark():
             ret += str(exp) + "\n"
         return ret
 
-    def re_initialize(self, k: int = 4, keep_prompter = False): # keep_prompter: UNTESTED
+    def re_initialize(self, k: int = 4, noisy_channel = False, keep_prompter = False): # keep_prompter: UNTESTED
         print("Initializing experimentor on k = {}...\n".format(k))
         self.experimentor = []
         if keep_prompter:
@@ -70,7 +72,8 @@ class benchmark():
                         original_dataset = data, 
                         k=k, 
                         metrics=self.metrics, 
-                        dividing=[configs.STANDARD_SETTINGS["split_for_FP"]["calibration_number"], configs.STANDARD_SETTINGS["split_for_FP"]["demonstration_number"], configs.STANDARD_SETTINGS["split_for_FP"]["test_number"]]
+                        dividing=[configs.STANDARD_SETTINGS["split_for_FP"]["calibration_number"], configs.STANDARD_SETTINGS["split_for_FP"]["demonstration_number"], configs.STANDARD_SETTINGS["split_for_FP"]["test_number"]],
+                        noisy_channel = noisy_channel
                         )
                     )
             elif data.get_dataset_name() == "tweet_eval_emotion":
@@ -79,12 +82,13 @@ class benchmark():
                         original_dataset = data, 
                         k=k, 
                         metrics=self.metrics, 
-                        dividing=[configs.STANDARD_SETTINGS["split_for_TEE"]["calibration_number"], configs.STANDARD_SETTINGS["split_for_TEE"]["demonstration_number"], configs.STANDARD_SETTINGS["split_for_TEE"]["test_number"]]
+                        dividing=[configs.STANDARD_SETTINGS["split_for_TEE"]["calibration_number"], configs.STANDARD_SETTINGS["split_for_TEE"]["demonstration_number"], configs.STANDARD_SETTINGS["split_for_TEE"]["test_number"]],
+                        noisy_channel = noisy_channel
                         )
                     )
             else:
                 self.experimentor.append(
-                    experimentor.single_experimentor(original_dataset = data, k=k, metrics=self.metrics)
+                    experimentor.single_experimentor(original_dataset = data, k=k, metrics=self.metrics, noisy_channel=noisy_channel)
                 )
         if keep_prompter:
             count = 0
@@ -105,7 +109,8 @@ class benchmark():
     def auto_run(
         self, 
         list_of_forward_inference: list[callable], # for each dataset, you should give a forward_inference function. If you just give one, we will expand it to the length of the benchmark.
-        return_divided_results = True
+        return_divided_results = True,
+        batched_inference = False
     ):
         count = 0
         if len(list_of_forward_inference) != len(self.experimentor):
@@ -117,21 +122,13 @@ class benchmark():
         ret_sum = {}
         for name, metric in self.metrics.items():
             ret_sum[name] = 0
-        for i, exp in enumerate(self.experimentor):
+        for i, single_experimentor in enumerate(self.experimentor):
             count += 1
             print("\n\nExperiment {} in {}".format(count, len(self._default_data)))
-            try:
-                temp_res, success = exp(list_of_forward_inference[i])
-            except Exception as r:
-                print(r)
-                success = False
-                temp_res = {}
-                for name, metric in self.metrics.items():
-                    temp_res[name] = 0
-            else:
-                ret_divided[exp.triplet_dataset.dataset_name] = temp_res
+            temp_res, success = single_experimentor(list_of_forward_inference[i], batched_inference)
+            ret_divided[single_experimentor.triplet_dataset.dataset_name] = temp_res
             if not success:
-                warnings.warn("The experimentor on the dataset " + exp.triplet_dataset.get_dataset_name() + " failed.")
+                warnings.warn("The experimentor on the dataset " + single_experimentor.triplet_dataset.get_dataset_name() + " failed.")
                 continue
             for name, metric in self.metrics.items():
                 ret_sum[name] += temp_res[name]

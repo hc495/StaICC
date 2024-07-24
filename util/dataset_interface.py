@@ -52,11 +52,6 @@ class triplet_dataset():
     
     def get_label_space(self):
         return self.demonstration.get_label_space()
-    
-    def change_label_space_triple(self, label_space: list[str]):
-        self.calibration.change_label_space(label_space)
-        self.demonstration.change_label_space(label_space)
-        self.test.change_label_space(label_space)
 
     def get_default_ground_truth_label(self, index):
         if index < 0 or index >= len(self.test):
@@ -67,6 +62,11 @@ class triplet_dataset():
         if index < 0 or index >= len(self.test):
             raise ValueError("Index out of range.")
         return self.test.find_index_from_label(self.get_default_ground_truth_label(index))
+
+    def change_label_space_triple(self, label_space: list[str]):
+        self.calibration.change_label_space(label_space)
+        self.demonstration.change_label_space(label_space)
+        self.test.change_label_space(label_space)
 
     def change_instruction_triple(self, instruction: str):
         self.calibration.change_instruction(instruction)
@@ -137,7 +137,7 @@ class demonstration_sampler():
 
     def __repr__(self):
         return self.__str__()
-
+    
     def get_sampled_indexes(self, index) -> list[int]:
         if index < 0 or index >= self._total_sample_numbers:
             raise ValueError("Index out of range.")
@@ -160,8 +160,13 @@ class prompt_writter():
     #   ...
     #   <prompt_writter.label_prefix> [MASKED]
     # ]
-    def __init__(self, triplet_dataset: triplet_dataset):
+    def __init__(self, triplet_dataset: triplet_dataset, use_noisy_channel = False):
         self.triplet_dataset = triplet_dataset
+        self.use_default_settings()
+        if use_noisy_channel:
+            self.use_noisy_channel()
+    
+    def use_default_settings(self):
         self.instruction = copy.deepcopy(self.triplet_dataset.demonstration.get_instruction())
         self.input_text_prefixes = copy.deepcopy(self.triplet_dataset.demonstration.get_input_text_prefixes())
         self.input_text_affixes = copy.deepcopy(self.triplet_dataset.demonstration.get_input_text_affixes())
@@ -170,7 +175,13 @@ class prompt_writter():
         self.query_prefix = copy.deepcopy(self.triplet_dataset.test.get_query_prefix())
         self.label_space = copy.deepcopy(self.triplet_dataset.demonstration.get_label_space())
         self._random_for_example = stable_random.stable_random()
+        self.noisy_channel = False
     
+    def use_noisy_channel(self, new_label_affix = " ", new_last_input_affix = "\n"):
+        self.noisy_channel = True
+        self.label_affix = new_label_affix
+        self.input_text_affixes[-1] = new_last_input_affix
+
     def __str__(self) -> str:
         return (
             "--- In-context Learning prompt writter ---" + 
@@ -188,7 +199,7 @@ class prompt_writter():
     def __repr__(self):
         ret = self.__str__() + "\n"
         ret += "\n------------An Example of Prompt------------\n"
-        ret += self.example()
+        ret += str(self.example())
         ret += "\n-------------------------------------------"
         ret += "\nWith:\n"
         ret += self.triplet_dataset.__repr__()
@@ -255,25 +266,36 @@ class prompt_writter():
         self.label_space = label_space
     
     def write_prompt(self, demos_indexes: list[int], query_index: int):
-        if query_index < 0 or query_index >= len(self.triplet_dataset.test):
-            raise ValueError("Index out of range.")
-        prompt = self.instruction
-
+        demo_lines = []
+        query_line = []
         for demosindex in demos_indexes:
             if demosindex < 0 or demosindex >= len(self.triplet_dataset.demonstration):
                 raise ValueError("Index out of range.")
-            for i in range(self.triplet_dataset.demonstration.get_input_element_numbers()):
-                prompt += self.input_text_prefixes[i] + self.triplet_dataset.demonstration.get_input_text(demosindex)[i] + self.input_text_affixes[i]
-            prompt += self.label_prefix + self.triplet_dataset.demonstration.get_label(demosindex) + self.label_affix
+            demo_lines.append((self.triplet_dataset.demonstration.get_input_text(demosindex), self.triplet_dataset.demonstration.get_label(demosindex)))
+        if query_index < 0 or query_index >= len(self.triplet_dataset.test):
+            raise ValueError("Index out of range.")
+        query_line = self.triplet_dataset.test.get_input_text(query_index)
+        return self.write_prompt_from_dataline(demo_lines, query_line)
+    
+        # if query_index < 0 or query_index >= len(self.triplet_dataset.test):
+        #     raise ValueError("Index out of range.")
+        # prompt = self.instruction
+
+        # for demosindex in demos_indexes:
+        #     if demosindex < 0 or demosindex >= len(self.triplet_dataset.demonstration):
+        #         raise ValueError("Index out of range.")
+        #     for i in range(self.triplet_dataset.demonstration.get_input_element_numbers()):
+        #         prompt += self.input_text_prefixes[i] + self.triplet_dataset.demonstration.get_input_text(demosindex)[i] + self.input_text_affixes[i]
+        #     prompt += self.label_prefix + self.triplet_dataset.demonstration.get_label(demosindex) + self.label_affix
         
-        prompt += self.query_prefix
-        for i in range(self.triplet_dataset.test.get_input_element_numbers()):
-            prompt += self.input_text_prefixes[i] + self.triplet_dataset.test.get_input_text(query_index)[i] + self.input_text_affixes[i]
-        prompt += self.label_prefix
-        return prompt
+        # prompt += self.query_prefix
+        # for i in range(self.triplet_dataset.test.get_input_element_numbers()):
+        #     prompt += self.input_text_prefixes[i] + self.triplet_dataset.test.get_input_text(query_index)[i] + self.input_text_affixes[i]
+        # prompt += self.label_prefix
+        # return prompt
     
     def write_prompt_from_dataline(self, demos_lines: list[(list[str], str)], query_line: list[str]):
-        # You can organize your own data lines and use this function to write the prompt for calibration.
+        # You can organize your own data line and use this function to write the prompt for inference or calibration.
         # For example, in the contextual calibration http://arxiv.org/abs/2102.09690, you can use the following parameters to write the prompt for calibration:
         # self.write_prompt_from_dataline(
         #   [
@@ -285,16 +307,38 @@ class prompt_writter():
         # And the output is: "review: thoughtful , provocative and entertaining . sentiment: positive\nreview: don't be fooled by the impressive cast list - eye see you is pure junk . sentiment: negative\nreview:  sentiment: "
         # demos_line: [(<demo1> [input1, input2, ...], label_word), (<demo2> [input1, input2, ...], label_word), ..., (<demok> [input1, input2, ...], label_word)]
         # query_line: [input1, input2, ...]
-        prompt = self.instruction
-        for demos in demos_lines:
-            for i in range(self.triplet_dataset.demonstration.get_input_element_numbers()):
-                prompt += self.input_text_prefixes[i] + demos[0][i] + self.input_text_affixes[i]
-            prompt += self.label_prefix + demos[1] + self.label_affix
-        prompt += self.query_prefix
-        for i in range(self.triplet_dataset.test.get_input_element_numbers()):
-            prompt += self.input_text_prefixes[i] + query_line[i] + self.input_text_affixes[i]
-        prompt += self.label_prefix
-        return prompt
+
+        
+        # NOISY CHANNEL
+        # https://arxiv.org/abs/2108.04106
+        # Return: List[str]: prompts for every label token.
+        if self.noisy_channel:
+            ret = []
+            for label in self.label_space:
+                prompt = self.instruction
+                for demos in demos_lines:
+                    prompt += self.label_prefix + demos[1] + self.label_affix
+                    for i in range(self.triplet_dataset.demonstration.get_input_element_numbers()):
+                        prompt += self.input_text_prefixes[i] + demos[0][i] + self.input_text_affixes[i]
+                prompt += self.label_prefix + label + self.label_affix + self.query_prefix
+                for i in range(self.triplet_dataset.test.get_input_element_numbers()):
+                    prompt += self.input_text_prefixes[i] + query_line[i] + self.input_text_affixes[i]
+                ret.append(prompt)
+            return ret
+            
+        # DIRECT
+        # Return: str
+        else:
+            prompt = self.instruction
+            for demos in demos_lines:
+                for i in range(self.triplet_dataset.demonstration.get_input_element_numbers()):
+                    prompt += self.input_text_prefixes[i] + demos[0][i] + self.input_text_affixes[i]
+                prompt += self.label_prefix + demos[1] + self.label_affix
+            prompt += self.query_prefix
+            for i in range(self.triplet_dataset.test.get_input_element_numbers()):
+                prompt += self.input_text_prefixes[i] + query_line[i] + self.input_text_affixes[i]
+            prompt += self.label_prefix
+            return prompt
     
     def example(self, k = 8):
         if k < 0 or k > len(self.triplet_dataset.demonstration):
