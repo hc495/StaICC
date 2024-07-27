@@ -105,11 +105,11 @@ class triplet_dataset():
 
 
 class demonstration_sampler():
-    def __init__(self, k: int, demonstration_set_size: int, total_sample_numbers: int):
+    def __init__(self, k: int, demonstration_set_size: int, total_sample_numbers: int, seed = configs.STANDARD_SETTINGS["random_seed"]):
         self._k = k
         self._demonstration_set_size = demonstration_set_size
         self._total_sample_numbers = total_sample_numbers
-        self._random = stable_random.stable_random()
+        self._random = stable_random.stable_random(seed=seed)
         
         self._sampled_indexes = []
         self._complie()
@@ -317,7 +317,7 @@ class prompt_writter():
             for label in self.label_space:
                 prompt = self.instruction
                 for demos in demos_lines:
-                    prompt += self.label_prefix + demos[1] + self.label_affix
+                    prompt += self.label_prefix + self.label_space[self.triplet_dataset.demonstration.find_index_from_label(demos[1])] + self.label_affix
                     for i in range(self.triplet_dataset.demonstration.get_input_element_numbers()):
                         prompt += self.input_text_prefixes[i] + demos[0][i] + self.input_text_affixes[i]
                 prompt += self.label_prefix + label + self.label_affix + self.query_prefix
@@ -333,7 +333,7 @@ class prompt_writter():
             for demos in demos_lines:
                 for i in range(self.triplet_dataset.demonstration.get_input_element_numbers()):
                     prompt += self.input_text_prefixes[i] + demos[0][i] + self.input_text_affixes[i]
-                prompt += self.label_prefix + demos[1] + self.label_affix
+                prompt += self.label_prefix + self.label_space[self.triplet_dataset.demonstration.find_index_from_label(demos[1])] + self.label_affix
             prompt += self.query_prefix
             for i in range(self.triplet_dataset.test.get_input_element_numbers()):
                 prompt += self.input_text_prefixes[i] + query_line[i] + self.input_text_affixes[i]

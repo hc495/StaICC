@@ -14,6 +14,7 @@ def standard_ICL_inference_with_torch_Causal_LM(
     label_space: list[str],
     cache_empty: callable = torch.cuda.empty_cache(), # GPU cache empty function. Can be torch.cuda.empty_cache.
     calibration_function: callable = None, # standard calibration receives label_space_prob, full_vocab_prob, hidden_state, returns probabilities distribution aligned to the label_space
+    return_hidden_state: bool = False
 ):
     with torch.no_grad():
         if cache_empty is not None:
@@ -28,9 +29,13 @@ def standard_ICL_inference_with_torch_Causal_LM(
         del tknzd_data
         del result
         if calibration_function is not None:
-            return calibration_function(label_space_prob, full_vocab_prob, last_hidden_state)
+            ret = calibration_function(label_space_prob, full_vocab_prob, last_hidden_state)
         else:
-            return label_space_prob
+            ret = label_space_prob
+        if return_hidden_state:
+            return (ret, last_hidden_state)
+        else:
+            return ret
     
 def batched_ICL_inference_with_torch_Causal_LM(
     prompt: list[str],

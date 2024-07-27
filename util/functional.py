@@ -6,6 +6,12 @@ def exp_to_list(list):
     return [math.exp(x) for x in list]
 
 
+def L2_dist(x, y):
+    if len(x) != len(y):
+        raise ValueError("The length of x and y should be the same.")
+    return sum([(x_i - y_i) ** 2 for x_i, y_i in zip(x, y)]) ** 0.5
+
+
 def softmax(x):
     f_x_max = max(x)
     f_x = [x_i - f_x_max for x_i in x]
