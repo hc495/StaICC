@@ -39,3 +39,6 @@ class stable_random():
             raise ValueError("sample_number should be less than max_index")
         index_list = list(range(max_index))
         return self.sample_n_elements_from_list(index_list, sample_number, allow_repetition)
+    
+    def shuffle_list(self, list):
+        return self.sample_n_elements_from_list(list, len(list), allow_repetition=False)

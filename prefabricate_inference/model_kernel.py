@@ -14,7 +14,8 @@ def standard_ICL_inference_with_torch_Causal_LM(
     label_space: list[str],
     cache_empty: callable = torch.cuda.empty_cache(), # GPU cache empty function. Can be torch.cuda.empty_cache.
     calibration_function: callable = None, # standard calibration receives label_space_prob, full_vocab_prob, hidden_state, returns probabilities distribution aligned to the label_space
-    return_hidden_state: bool = False
+    return_hidden_state: bool = False,
+    return_full_vocab_prob: bool = False
 ):
     with torch.no_grad():
         if cache_empty is not None:
@@ -33,9 +34,13 @@ def standard_ICL_inference_with_torch_Causal_LM(
         else:
             ret = label_space_prob
         if return_hidden_state:
-            return (ret, last_hidden_state)
-        else:
-            return ret
+            ret = (ret, last_hidden_state)
+        if return_full_vocab_prob:
+            if return_hidden_state:
+                ret.append(full_vocab_prob)
+            else:
+                ret = (ret, full_vocab_prob)
+        return ret
     
 def batched_ICL_inference_with_torch_Causal_LM(
     prompt: list[str],
@@ -49,9 +54,9 @@ def batched_ICL_inference_with_torch_Causal_LM(
     with torch.no_grad():
         ori_results = []
         count = 0
-        for prompt in prompt:
+        for single_prompt in prompt:
             ori_results.append(standard_ICL_inference_with_torch_Causal_LM(
-                prompt = prompt, 
+                prompt = single_prompt, 
                 model = model, 
                 tokenizer = tokenizer, 
                 label_space = label_space, 
@@ -87,3 +92,22 @@ def noisy_channel_ICL_inference_with_torch_Causal_LM(
             del tknzd_data
         loss_with_labels = [loss_with_labels[0] - loss_with_labels[i] for i in range(0, len(loss_with_labels))]
         return functional.softmax(loss_with_labels)
+    
+def standard_ICL_inference_with_API_call(
+    API_call: callable, # The API call function, input: string for prompt, output: string for 1 token
+    prompt: str,
+    label_space: list[str],
+):
+    result_in_str = API_call(prompt)
+    return functional.softmax([1 if result_in_str == label else 0 for label in label_space])
+
+def _GPT_API_call(prompt: str, model_name = "gpt-3.5-turbo-instruct"):
+    import openai
+    from openai import Completion, ChatCompletion
+    next = Completion.create(
+        model=model_name,
+        prompt=prompt,
+        max_tokens=1,
+        temperature=0
+    )
+    return next.choices[0].text

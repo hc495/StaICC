@@ -1,9 +1,9 @@
 # Adapt datasets into a list_formed class
-import datasets # The only external library we use in this library.
 from . import stable_random
 from . import configs
 import warnings
 import copy
+import pickle
 
 class basic_datasets_loader():
     # Interface for prompt_writer. 
@@ -58,7 +58,9 @@ class basic_datasets_loader():
         return len(self.table)
 
     def __getitem__(self, index: int):
-        # Should return a list of strings. The length is the number of input elements.
+        # Should return a (list of strings, string). 
+        # list of string: The length is the number of input elements.
+        # string: The label.
         return (self.get_input_text(index), self.get_label(index))
     
     def __str__(self) -> str:
@@ -123,6 +125,13 @@ class basic_datasets_loader():
         if type(new_name) is not str:
             raise ValueError("Dataset name should be a string.")
         self.dataset_name = new_name
+
+    def cut_by_index(self, index: int):
+        # This function is used to cut the dataset by index.
+        if index < 0 or index > len(self):
+            raise ValueError("Index out of range.")
+        self.table = self.table[0:index]
+        return self
     
     def get_dataset(self):
         return self.table
@@ -260,89 +269,106 @@ class basic_datasets_loader():
 class glue_sst2(basic_datasets_loader):
     # https://aclanthology.org/D13-1170/
     # https://arxiv.org/abs/1804.07461
-    def __init__(self, long_text_classification = False):
+    def __init__(self, long_text_classification = False, from_cache = True):
         super().__init__()
 
         self._input_text_prefixes = ["sentence: "]
-        self._hgf_dataset = datasets.load_dataset("glue", "sst2")['train']
         self._label_space = ["negative", "positive"] # LIST of STRING. Space for the label. Will be overloaded by the dataset.
+        self.label_space_numbers = len(self._label_space)
         self._label_prefix = "sentiment: "
         self._label_mapping = {0:0, 1:1} # DICT. INT to INT. Mapping from label index from _hgf_dataset to the label index of _label_space. Will be overloaded by the dataset.
         self.dataset_name = "GLUE-SST2" # STRING. Name of the dataset. Will be overloaded by the dataset.
         self._long_text_classification = long_text_classification
-        self._complie_dataset()
+        self.input_element_numbers = 1
+
+        if not from_cache:
+            import datasets
+            self._hgf_dataset = datasets.load_dataset("glue", "sst2")['train']
+            self._complie_dataset()
+        else:
+            pickle_file = open("./StaICC/cached_dataset/sst2.dataset", "rb")
+            self.table = pickle.load(pickle_file)
     
     def _complie_dataset(self):
         self.table = []
         for i in range(0, len(self._hgf_dataset)):
             self.table.append(([self._hgf_dataset[i]["sentence"]], self._hgf_dataset[i]["label"]))
-        self.input_element_numbers = 1
         del self._hgf_dataset
 
         self._automatic_cut_by_length()
         self._shuffle()
-        self.label_space_numbers = len(self._label_space)
 
 
 class rotten_tomatoes(basic_datasets_loader):
     # https://arxiv.org/abs/cs/0506075
-    def __init__(self, long_text_classification = False):
+    def __init__(self, long_text_classification = False, from_cache = True):
         super().__init__()
 
         self._input_text_prefixes = ["review: "]
-        self._hgf_dataset = datasets.load_dataset("cornell-movie-review-data/rotten_tomatoes")['train']
         self._label_space = ["negative", "positive"] 
         self._label_prefix = "sentiment: "
         self._label_mapping = {0:0, 1:1} 
         self.dataset_name = "rotten_tomatoes" 
         self._long_text_classification = long_text_classification
-        self._complie_dataset()
+        self.label_space_numbers = len(self._label_space)
+        self.input_element_numbers = 1
+
+        if not from_cache:
+            import datasets
+            self._hgf_dataset = datasets.load_dataset("cornell-movie-review-data/rotten_tomatoes")['train']
+            self._complie_dataset()
+        else:
+            pickle_file = open("./StaICC/cached_dataset/rotten_tomatoes.dataset", "rb")
+            self.table = pickle.load(pickle_file)
     
     def _complie_dataset(self):
         self.table = []
         for i in range(0, len(self._hgf_dataset)):
             self.table.append(([self._hgf_dataset[i]["text"]], self._hgf_dataset[i]["label"]))
-        self.input_element_numbers = 1
         del self._hgf_dataset
 
         self._automatic_cut_by_length()
         self._shuffle()
-        self.label_space_numbers = len(self._label_space)
-
+        
 
 class financial_phrasebank(basic_datasets_loader):
     # https://arxiv.org/abs/1307.5336
-    def __init__(self, long_text_classification = False):
+    def __init__(self, long_text_classification = False, from_cache = True):
         super().__init__()
 
         self._input_text_prefixes = ["sentence: "]
-        self._hgf_dataset = datasets.load_dataset("financial_phrasebank", "sentences_allagree")['train']
         self._label_space = ['negative', 'neutral', 'positive']
         self._label_prefix = "sentiment: "
         self._label_mapping = {0:0, 1:1, 2:2} 
         self.dataset_name = "financial_phrasebank" 
         self._long_text_classification = long_text_classification
-        self._complie_dataset()
+        self.input_element_numbers = 1
+        self.label_space_numbers = len(self._label_space)
+
+        if not from_cache:
+            import datasets
+            self._hgf_dataset = datasets.load_dataset("financial_phrasebank", "sentences_allagree")['train']
+            self._complie_dataset()
+        else:
+            pickle_file = open("./StaICC/cached_dataset/financial_phrasebank.dataset", "rb")
+            self.table = pickle.load(pickle_file)
     
     def _complie_dataset(self):
         self.table = []
         for i in range(0, len(self._hgf_dataset)):
             self.table.append(([self._hgf_dataset[i]["sentence"]], self._hgf_dataset[i]["label"]))
-        self.input_element_numbers = 1
         del self._hgf_dataset
 
         self._automatic_cut_by_length()
         self._shuffle()
-        self.label_space_numbers = len(self._label_space)
 
 
 class sst5(basic_datasets_loader):
     # https://aclanthology.org/D13-1170/
-    def __init__(self, long_text_classification = False):
+    def __init__(self, long_text_classification = False, from_cache = True):
         super().__init__()
 
         self._input_text_prefixes = ["sentence: "]
-        self._hgf_dataset = datasets.load_dataset("SetFit/sst5", "sentences_allagree")['train']
         self._label_space = None
         self._ground_truth_label_space = ['very negative', 'negative', 'neutral', 'positive', 'very positive']
         self._reducted_label_space = ['poor', 'bad', 'neutral', 'good', 'great']
@@ -350,60 +376,72 @@ class sst5(basic_datasets_loader):
         self._label_prefix = "sentiment: "
         self.dataset_name = "SST5" 
         self._long_text_classification = long_text_classification
-        self._complie_dataset()
+        self.input_element_numbers = 1
+        self.reduct_label_token()
+        self.label_space_numbers = len(self._label_space)
+
+        if not from_cache:
+            import datasets
+            self._hgf_dataset = datasets.load_dataset("SetFit/sst5", "sentences_allagree")['train']
+            self._complie_dataset()
+        else:
+            pickle_file = open("./StaICC/cached_dataset/sst5.dataset", "rb")
+            self.table = pickle.load(pickle_file)
     
     def _complie_dataset(self):
         self.table = []
         for i in range(0, len(self._hgf_dataset)):
             self.table.append(([self._hgf_dataset[i]["text"]], self._hgf_dataset[i]["label"]))
-        self.input_element_numbers = 1
         del self._hgf_dataset
 
         self._automatic_cut_by_length()
         self._shuffle()
-        self.reduct_label_token()
-        self.label_space_numbers = len(self._label_space)
 
 # 2 Topic Classification Datasets
 class trec(basic_datasets_loader):
     # https://www.aclweb.org/anthology/C02-1150
     # https://www.aclweb.org/anthology/H01-1069
-    def __init__(self, long_text_classification = False):
+    def __init__(self, long_text_classification = False, from_cache = True):
         super().__init__()
 
         self._input_text_prefixes = ["question: "]
-        self._hgf_dataset = datasets.load_dataset("CogComp/trec")
-        self._hgf_dataset = datasets.concatenate_datasets([self._hgf_dataset['train'], self._hgf_dataset['test']])
         self._label_space = None
         self._ground_truth_label_space = ['abbreviation', 'entity', 'description and abstract concept', 'human being', 'location', 'numeric value']
         self._reducted_label_space = ['short', 'entity', 'description', 'person', 'location', 'number'] # https://arxiv.org/pdf/2305.19148
         self._label_mapping = {0:0, 1:1, 2:2, 3:3, 4:4, 5:5} 
         self._label_prefix = "target: "
         self.dataset_name = "TREC" 
+        self.reduct_label_token()
+        self.label_space_numbers = len(self._label_space)
         self._long_text_classification = long_text_classification
-        self._complie_dataset()
+        self.input_element_numbers = 1
+
+        if not from_cache:
+            import datasets
+            self._hgf_dataset = datasets.load_dataset("CogComp/trec")
+            self._hgf_dataset = datasets.concatenate_datasets([self._hgf_dataset['train'], self._hgf_dataset['test']])
+            self._complie_dataset()
+        else:
+            pickle_file = open("./StaICC/cached_dataset/trec.dataset", "rb")
+            self.table = pickle.load(pickle_file)
     
     def _complie_dataset(self):
         self.table = []
         for i in range(0, len(self._hgf_dataset)):
             self.table.append(([self._hgf_dataset[i]["text"]], self._hgf_dataset[i]["coarse_label"]))
-        self.input_element_numbers = 1
         del self._hgf_dataset
 
         self._automatic_cut_by_length()
         self._shuffle()
-        self.reduct_label_token()
-        self.label_space_numbers = len(self._label_space)
 
 
 class agnews(basic_datasets_loader):
     # https://arxiv.org/abs/1509.01626
-    def __init__(self, long_text_classification = False):
+    def __init__(self, long_text_classification = False, from_cache = True):
         super().__init__()
 
         self._input_text_prefixes = ["news: "]
-        self._hgf_dataset = datasets.load_dataset("ag_news")
-        self._hgf_dataset = datasets.concatenate_datasets([self._hgf_dataset['train'], self._hgf_dataset['test']])
+        
         self._label_space = None
         self._ground_truth_label_space = ['world', 'sports', 'business', 'sci/tech']
         self._reducted_label_space = ['world', 'sports', 'business', 'science']
@@ -411,28 +449,35 @@ class agnews(basic_datasets_loader):
         self._label_prefix = "topic: "
         self.dataset_name = "AGNews" 
         self._long_text_classification = long_text_classification
-        self._complie_dataset()
-    
+        self.input_element_numbers = 1
+        self.reduct_label_token()
+        self.label_space_numbers = len(self._label_space)
+
+        if not from_cache:
+            import datasets
+            self._hgf_dataset = datasets.load_dataset("ag_news")
+            self._hgf_dataset = datasets.concatenate_datasets([self._hgf_dataset['train'], self._hgf_dataset['test']])
+            self._complie_dataset()
+        else:
+            pickle_file = open("./StaICC/cached_dataset/agnews.dataset", "rb")
+            self.table = pickle.load(pickle_file)
+            
     def _complie_dataset(self):
         self.table = []
         for i in range(0, len(self._hgf_dataset)):
             self.table.append(([self._hgf_dataset[i]["text"]], self._hgf_dataset[i]["label"]))
-        self.input_element_numbers = 1
         del self._hgf_dataset
 
         self._automatic_cut_by_length()
         self._shuffle()
-        self.reduct_label_token()
-        self.label_space_numbers = len(self._label_space)
 
 
 class subjective(basic_datasets_loader):
     # https://dl.acm.org/doi/10.5555/2390665.2390688
-    def __init__(self, long_text_classification = False):
+    def __init__(self, long_text_classification = False, from_cache = True):
         super().__init__()
 
         self._input_text_prefixes = ["review: "]
-        self._hgf_dataset = datasets.load_dataset("SetFit/subj")['train']
         self._label_space = None
         self._ground_truth_label_space = ['objective', 'subjective']
         self._reducted_label_space = ['false', 'true']
@@ -440,28 +485,35 @@ class subjective(basic_datasets_loader):
         self._label_prefix = "subjectiveness: "
         self.dataset_name = "Subjective" 
         self._long_text_classification = long_text_classification
-        self._complie_dataset()
+        self.reduct_label_token()
+        self.input_element_numbers = 1
+        self.label_space_numbers = len(self._label_space)
+
+        if not from_cache:
+            import datasets
+            self._hgf_dataset = datasets.load_dataset("SetFit/subj")['train']
+            self._complie_dataset()
+        else:
+            pickle_file = open("./StaICC/cached_dataset/subjective.dataset", "rb")
+            self.table = pickle.load(pickle_file)
     
     def _complie_dataset(self):
         self.table = []
         for i in range(0, len(self._hgf_dataset)):
             self.table.append(([self._hgf_dataset[i]["text"]], self._hgf_dataset[i]["label"]))
-        self.input_element_numbers = 1
         del self._hgf_dataset
-
         self._automatic_cut_by_length()
         self._shuffle()
-        self.reduct_label_token()
+        
 
 
 class tweet_eval_emotion(basic_datasets_loader):
     # https://aclanthology.org/S18-1001/
-    def __init__(self, long_text_classification = False):
+    def __init__(self, long_text_classification = False, from_cache = True):
         super().__init__()
 
         self._input_text_prefixes = ["tweet: "]
-        self._hgf_dataset = datasets.load_dataset("tweet_eval", "emotion")
-        self._hgf_dataset = datasets.concatenate_datasets([self._hgf_dataset['train'], self._hgf_dataset['validation'], self._hgf_dataset['test']])
+        
         self._label_space = None
         self._ground_truth_label_space = ['anger', 'joy', 'optimism', 'sadness']
         self._reducted_label_space = ['anger', 'joy', 'positive', 'sad']
@@ -469,27 +521,35 @@ class tweet_eval_emotion(basic_datasets_loader):
         self._label_prefix = "emotion: "
         self.dataset_name = "tweet_eval_emotion" 
         self._long_text_classification = long_text_classification
-        self._complie_dataset()
+        self.reduct_label_token()
+        self.input_element_numbers = 1
+        self.label_space_numbers = len(self._label_space)
+
+        if not from_cache:
+            import datasets
+            self._hgf_dataset = datasets.load_dataset("tweet_eval", "emotion")
+            self._hgf_dataset = datasets.concatenate_datasets([self._hgf_dataset['train'], self._hgf_dataset['validation'], self._hgf_dataset['test']])
+            self._complie_dataset()
+        else:
+            pickle_file = open("./StaICC/cached_dataset/tweet_eval_emotion.dataset", "rb")
+            self.table = pickle.load(pickle_file)
 
     def _complie_dataset(self):
         self.table = []
         for i in range(0, len(self._hgf_dataset)):
             self.table.append(([self._hgf_dataset[i]["text"]], self._hgf_dataset[i]["label"]))
-        self.input_element_numbers = 1
         del self._hgf_dataset
 
         self._automatic_cut_by_length()
         self._shuffle()
-        self.reduct_label_token()
 
 
 class tweet_eval_hate(basic_datasets_loader):
     # https://aclanthology.org/S19-2007/
-    def __init__(self, long_text_classification = False):
+    def __init__(self, long_text_classification = False, from_cache = True):
         super().__init__()
 
         self._input_text_prefixes = ["tweet: "]
-        self._hgf_dataset = datasets.load_dataset("tweet_eval", "hate")['train']
         self._label_space = None
         self._ground_truth_label_space = ['non-hate', 'hate']
         self._reducted_label_space = ['normal', 'hate']
@@ -497,27 +557,35 @@ class tweet_eval_hate(basic_datasets_loader):
         self._label_prefix = "hate speech: "
         self.dataset_name = "tweet_eval_hate" 
         self._long_text_classification = long_text_classification
-        self._complie_dataset()
+        self.reduct_label_token()
+        self.input_element_numbers = 1
+        self.label_space_numbers = len(self._label_space)
+
+        if not from_cache:
+            import datasets
+            self._hgf_dataset = datasets.load_dataset("tweet_eval", "hate")['train']
+            self._complie_dataset()
+        else:
+            pickle_file = open("./StaICC/cached_dataset/tweet_eval_hate.dataset", "rb")
+            self.table = pickle.load(pickle_file)
 
     def _complie_dataset(self):
         self.table = []
         for i in range(0, len(self._hgf_dataset)):
             self.table.append(([self._hgf_dataset[i]["text"]], self._hgf_dataset[i]["label"]))
-        self.input_element_numbers = 1
         del self._hgf_dataset
 
         self._automatic_cut_by_length()
         self._shuffle()
-        self.reduct_label_token()
 
 
 class hate_speech_18(basic_datasets_loader):
     #
-    def __init__(self, long_text_classification = False):
+    def __init__(self, long_text_classification = False, from_cache = True):
         super().__init__()
 
         self._input_text_prefixes = ["tweet: "]
-        self._hgf_dataset = datasets.load_dataset("hate_speech18")['train']
+        
         self._label_space = None
         self._ground_truth_label_space = ["noHate", "hate", "idk/skip", "relation"]
         self._reducted_label_space = ['normal', 'hate', 'skip', 'relation']
@@ -525,15 +593,47 @@ class hate_speech_18(basic_datasets_loader):
         self._label_prefix = "hate speech: "
         self.dataset_name = "hate_speech_18" 
         self._long_text_classification = long_text_classification
-        self._complie_dataset()
+        self.input_element_numbers = 1
+        self.reduct_label_token()
+        self.label_space_numbers = len(self._label_space)
+
+        if not from_cache:
+            import datasets
+            self._hgf_dataset = datasets.load_dataset("hate_speech18")['train']
+            self._complie_dataset()
+        else:
+            pickle_file = open("./StaICC/cached_dataset/hate_speech_18.dataset", "rb")
+            self.table = pickle.load(pickle_file)
 
     def _complie_dataset(self):
         self.table = []
         for i in range(0, len(self._hgf_dataset)):
             self.table.append(([self._hgf_dataset[i]["text"]], self._hgf_dataset[i]["label"]))
-        self.input_element_numbers = 1
         del self._hgf_dataset
 
         self._automatic_cut_by_length()
         self._shuffle()
-        self.reduct_label_token()
+
+
+class un_reducted_trec(trec):
+    def __init__(self, long_text_classification = False, from_cache = True):
+        super().__init__(long_text_classification, from_cache)
+        self.full_label_token()
+
+
+class un_reducted_agnews(agnews):
+    def __init__(self, long_text_classification = False, from_cache = True):
+        super().__init__(long_text_classification, from_cache)
+        self.full_label_token()
+
+
+class un_reducted_tweet_eval_emotion(tweet_eval_emotion):
+    def __init__(self, long_text_classification = False, from_cache = True):
+        super().__init__(long_text_classification, from_cache)
+        self.full_label_token()
+
+
+class un_reducted_sst5(sst5):
+    def __init__(self, long_text_classification = False, from_cache = True):
+        super().__init__(long_text_classification, from_cache)
+        self.full_label_token()

@@ -5,12 +5,44 @@ from . import configs
 def exp_to_list(list):
     return [math.exp(x) for x in list]
 
-
 def L2_dist(x, y):
     if len(x) != len(y):
         raise ValueError("The length of x and y should be the same.")
     return sum([(x_i - y_i) ** 2 for x_i, y_i in zip(x, y)]) ** 0.5
 
+def two_d_list_mean(x):
+    sum = [0] * len(x[0])
+    for x_i in x:
+        for i in range(len(x_i)):
+            sum[i] += x_i[i]
+    return [x_i / len(x) for x_i in sum]
+
+def bias_mean_metric(ground_truth, prediction):
+    return two_d_list_mean(prediction)
+
+def bias_mean_entropy_metric(ground_truth, prediction):
+    return entropy(two_d_list_mean(prediction))
+
+def post_bias_dis_metric(ground_truth, prediction):
+    label_dis = [0] * len(prediction[0])
+    for i in range(len(ground_truth)):
+        label_dis[ground_truth[i]] += 1
+    label_dis = [x / len(ground_truth) for x in label_dis]
+    averaged_prediction = two_d_list_mean(prediction)
+    return [prediction_i - label_dis_i for prediction_i, label_dis_i in zip(averaged_prediction, label_dis)]
+
+def kl_divergence(x, y):
+    if len(x) != len(y):
+        raise ValueError("The length of x and y should be the same.")
+    return sum([x_i * math.log(x_i / y_i) for x_i, y_i in zip(x, y)])
+
+def post_bias_dl_metric(ground_truth, prediction):
+    label_dis = [0] * len(prediction[0])
+    for i in range(len(ground_truth)):
+        label_dis[ground_truth[i]] += 1
+    label_dis = [x / len(ground_truth) for x in label_dis]
+    averaged_prediction = two_d_list_mean(prediction)
+    return kl_divergence(averaged_prediction, label_dis)
 
 def softmax(x):
     f_x_max = max(x)
@@ -19,10 +51,19 @@ def softmax(x):
     sum_x = sum(f_x)
     return [x_i / sum_x for x_i in f_x]
 
+def entropy(x): # nats
+    if not all([0 <= x_i <= 1 for x_i in x]):
+        x = softmax(x)
+    if type(x[0]) != list:
+        return -sum([x_i * math.log(x_i) for x_i in x if x_i != 0])
+    else:
+        return entropy(two_d_list_mean(x))
 
 def argmax(x):
     return max(range(len(x)), key=lambda i: x[i])
 
+def argmin(x):
+    return min(range(len(x)), key=lambda i: x[i])
 
 def unique_check(list):
     if len(list) != len(set(list)):
@@ -30,21 +71,20 @@ def unique_check(list):
     else:
         return True
 
-
 def linspace(start, end, num):
     if num <= 1:
         raise ValueError("num should be greater than 1.")
     return [start + (end - start) * i / (num - 1) for i in range(num)]
 
-
 def extend_onehot_prediction_to_logits(prediction: list[int]) -> list[list[float]]:
     if type(prediction[0]) == list:
         return prediction
-    if not all([0 <= x < len(prediction) for x in prediction]):
-        raise ValueError("The prediction should be in the range of [0, len(prediction)).")
+    return [[1 if i == x else 0 for i in range(max(prediction) + 1)] for x in prediction]
     
-    return [[1 if i == x else 0 for i in range(len(prediction))] for x in prediction]
-    
+def compress_logits_prediction_to_onehot(prediction: list[list[float]]) -> list[int]:
+    if type(prediction[0]) == int:
+        return prediction
+    return [argmax(x) for x in prediction]
 
 def accuracy(ground_truth: list[int], prediction):
     if len(ground_truth) != len(prediction):

@@ -1,10 +1,53 @@
-from . import configs
-from . import dataset_interface
-from . import functional
+from . import configs, functional, stable_random, dataset_interface
 import copy
 import warnings
 
 class single_experimentor():
+    """
+        The main experimentor for this toolkit.
+        The single_experimentor is designed to test the forward inference function on the triplet dataset.
+        The forward inference function should be a callable that takes a prompt and returns a list of label logits or a label index.
+        Main members:
+            _triplet_dataset: dataset_interface.triplet_dataset; The dataset for the experiment.
+                - You should'n access this member directly. Use the methods to access the dataset.
+            prompt_former: dataset_interface.prompt_writter; The prompt former for the experiment.
+                - You can use the methods in this member to design the prompt templates.
+            demonstration_sampler: dataset_interface.demonstration_sampler; The demonstration sampler for the experiment.
+                - You can reload it into a list-shaped list of integers to sample the demonstrations for each test sample.
+                - The reloading list shape: [test_sample_index][demonstration_sample_index (k)]. e.g. [[1, 2, 3], [4, 7, 5], [7, 1, 2]] for k=3, test_sample_number=3.
+            _k: The number of demonstrations for each test sample.
+                - Should only be set in initialization.
+                - You shouldn't set this member after initialization.
+            _repeat_times: The number of times the test samples will be tested.
+            metrics: The metrics for the experiment.
+                - You can add or remove metrics by changing this member.
+                - The metrics should be a dictionary with the format: {metric_name: metric_function}.
+        Main methods:
+            __init__: The initialization method.
+                - triplet_dataset: dataset_interface.triplet_dataset; The dataset for the experiment.
+                - original_dataset: dataset_interface.original_dataset; The original dataset for the experiment.
+              >> You should provide at least and only one dataset.
+                - k: int; The number of demonstrations for each test sample.
+                - metrics: dict; The metrics for the experiment.
+                - repeat_times: int; The number of times the test samples will be tested. Default: 2.
+                - dividing: list[int]; The dividing list for the triplet dataset. 
+                - noisy_channel: bool; If True, the prompt will be given as a noisy channel form (label, input; label, input; ...).
+            __call__: The callable method for the experiment.
+                - forward_inference: callable; The forward inference function.
+                - batched_inference: bool; If True, the forward_inference function should be a function that takes a list of prompts and returns a list of logits for each label.
+            reset_demonstration_sampler: Reset the demonstration sampler to the default state. The anti-operation of set_demonstration_sampler.
+            get_prompt_writter_from_dataline: Get the function prompt_former.write_prompt_from_dataline.
+            get_label_space: Get the label space of the dataset.
+            set_demonstration_sampler: Set the demonstration sampler to a fixed list-shaped sampler.
+                - sampler: list[list[int]]; The sampler for the demonstrations.
+            auto_run: The main method for the experiment. == __call__.
+                - forward_inference: callable; The forward inference function defined by user. See the prefabricate_inference library as examples. 
+                    (prompt: str, label_space: list[str]) -> list[float] <logits> or int <label>. OR (prompts: list[str], label_space: list[str]) -> list[list[float]] <logits> or list[int] <label>.
+                - batched_inference: bool; If True, the forward_inference function should be a function that takes a list of prompts and returns a list of logits for each label.
+            calibration_set: Get the calibration set of the dataset.
+            demonstration_set: Get the demonstration set of the dataset.
+            test_set: Get the test set of the dataset.
+    """
     def __init__(self, 
         triplet_dataset = None, 
         original_dataset = None, 
@@ -39,19 +82,26 @@ class single_experimentor():
             self.triplet_dataset = dataset_interface.triplet_dataset(original_dataset, dividing[0], dividing[1], dividing[2])
         
         self.prompt_former = dataset_interface.prompt_writter(self.triplet_dataset, noisy_channel)
-        self._demonstration_sampler = dataset_interface.demonstration_sampler(self._k, len(self.triplet_dataset.demonstration), repeat_times * len(self.triplet_dataset.test))
-        self._default_demonstration_sampler = copy.deepcopy(self._demonstration_sampler)
+        self.demonstration_sampler = dataset_interface.demonstration_sampler(self._k, len(self.triplet_dataset.demonstration), repeat_times * len(self.triplet_dataset.test))
+        self._default_demonstration_sampler = copy.deepcopy(self.demonstration_sampler)
         self._default_repeat_times = repeat_times
         self._repeat_times = repeat_times
         self.metrics = metrics
+        self.label_dis = [0] * len(self.triplet_dataset.get_label_space())
+        self.predictions = []
+        self.bias_type = "None"
+    
+    def __len__(self):
+        return len(self.triplet_dataset.test) * self._repeat_times
 
-    def __call__(self, forward_inference: callable, batched_inference = False):
-        return self.auto_run(forward_inference, batched_inference)
+    def __call__(self, forward_inference: callable, batched_inference = False, return_outputs = False):
+        return self.auto_run(forward_inference, batched_inference, return_outputs)
     
     def __str__(self) -> str:
         ret = ("--- single experimentor ---\n" +
         "\nTriplet Dataset: " + str(self.triplet_dataset) +
         "\nPrompt Former: " + str(self.prompt_former) +
+        "\nDemonstration Sampler: " + str(self.demonstration_sampler) +
         "\nK: " + str(self._k) +
         "\nMetrics: " + str(self.metrics) +
         "\nSamples for each test sample: " + str(self._repeat_times))
@@ -62,11 +112,17 @@ class single_experimentor():
 
     def _get_prompts_for_test_sample(self, test_sample_index: int, repeat_time: int):
         # repeat_time_from_0
-        demos_indexes = self._demonstration_sampler[test_sample_index + repeat_time * len(self.triplet_dataset.test)]
+        demos_indexes = self.demonstration_sampler[test_sample_index + repeat_time * len(self.triplet_dataset.test)]
         return self.prompt_former.write_prompt(demos_indexes, test_sample_index)
 
+    def get_k(self):
+        return self._k
+    
+    def get_repeat_times(self):
+        return self._repeat_times
+
     def reset_demonstration_sampler(self):
-        self._demonstration_sampler = copy.deepcopy(self._default_demonstration_sampler)
+        self.demonstration_sampler = copy.deepcopy(self._default_demonstration_sampler)
         self._repeat_times = self._default_repeat_times
 
     def get_prompt_writter_from_dataline(self):
@@ -79,13 +135,13 @@ class single_experimentor():
         # The sampler can be a list-shaped list of integers. 
         # The self._default_repeat_times will be set to 1 since no repeat time is needed with a fixed sampler.
         # The demonstrations will be sampled as: sampler[test_sample_index].
-        # For example: when the sampler is: [[1, 2, 3], [4, 5, 6], [7, 8, 9]], the demonstrations for the first test sample will be the [1, 2, 3] samples in the demonstration set and so on.
+        # For example: when the sampler is: [[1, 2, 3], [4, 5, 6], [7, 8, 9]], the demonstrations for the first test sample will be the [1, 2, 3]-th samples in the demonstration set and so on.
         warnings.warn(configs.WARNING_SETTINGS["tampering"])
         if len(sampler) != len(self.triplet_dataset.test):
             raise ValueError("The length of the sampler should be equal to the number of the test samples.")
         if all([len(x) != self._k for x in sampler]):
             raise ValueError("The length of each sample in the sampler should be equal to k.")
-        self._demonstration_sampler = sampler
+        self.demonstration_sampler = sampler
         self._repeat_times = 1
 
     def auto_run(
@@ -93,13 +149,14 @@ class single_experimentor():
         forward_inference: callable, 
             # When batched_inference is disabled, forward_inference: (prompt: str, label_space: list[str]) -> list[float] <logits> or int <label>. The inputted parameter signs are fixed to prompt and label_space.
             # When batched_inference is enabled, forward_inference: (prompts: list[str], label_space: list[str]) -> list[list[float]] <logits> or list[int] <label>.
-        batched_inference = False # for batched inference like BatchCalibration.
+        batched_inference = False, # for batched inference like BatchCalibration.
             # If enabled, we will input all the prompts into the forward_inference; and if disabled, we will input the prompt into the forward_inference one by one
+        return_outputs = False # If True, the outputs will be returned.
     ):
         # The forward_inference function should be a callable that takes a prompt and returns a list of label logits or a label index.
         # We encourage the forward_inference function to be a function that takes a prompt and returns a list of logits for each label, so that we can calculate more metrics.
         # >> If you use a function that returns a label index, the metrics that require logits will be calculated as if the logits are one-hot encoded.
-        print("\nStart testing the forward inference function " + str(forward_inference) + " on the dataset: " + str(self.triplet_dataset.test.dataset_name))
+        print("\nStart testing the forward inference function " + str(forward_inference) + " on the dataset: " + str(self.triplet_dataset.test.dataset_name) + " with bias type: " + self.bias_type + ".\n")
         success = False
         if self._k > len(self.triplet_dataset.demonstration):
             warnings.warn("The k value is larger than the length of the demonstration dataset. Return all-0 results.")
@@ -113,11 +170,13 @@ class single_experimentor():
 
         # INFERENCE
         if not batched_inference:
+            # Iterative inference: forward_inference: (prompt: str, label_space: list[str]) -> list[float] <logits> or int <label>. Inferring one by one.
             for time in range(self._repeat_times):
                 for index in range(len(self.triplet_dataset.test)):
                     prompt = self._get_prompts_for_test_sample(index, time)
                     result = forward_inference(prompt = prompt, label_space = self.triplet_dataset.get_label_space()) # The inputted parameter signs are fixed to prompt and label_space.
-                    ground_truth.append(self.triplet_dataset.get_default_ground_truth_label_index(index))
+                    ground_truth.append(self.triplet_dataset.get_default_ground_truth_label_from_index(index))
+                    self.label_dis[ground_truth[-1]] += 1
                     prediction.append(result)
                     print("\r", end="")
                     print("Process: {}%, {} in {}".format(
@@ -126,18 +185,23 @@ class single_experimentor():
                         total_samples
                     ), ">>" * int((index + time * len(self.triplet_dataset.test)) / total_samples * 32), end="")
         else:
+            # Batched inference: forward_inference: (prompts: list[str], label_space: list[str]) -> list[list[float]] <logits> or list[int] <label>. Inferring all at once
             prompts = []
             for time in range(self._repeat_times):
                 for index in range(len(self.triplet_dataset.test)):
                     prompts.append(self._get_prompts_for_test_sample(index, time))
-                    ground_truth.append(self.triplet_dataset.get_default_ground_truth_label_index(index))
+                    ground_truth.append(self.triplet_dataset.get_default_ground_truth_label_from_index(index))
+                    self.label_dis[ground_truth[-1]] += 1
             prediction = forward_inference(prompt = prompts, label_space = self.triplet_dataset.get_label_space())
 
         # TEST
         ret = {}
         for metric_name, metric_function in self.metrics.items():
-            ret[metric_name] = metric_function(ground_truth, functional.extend_onehot_prediction_to_logits(prediction))
+            self.predictions = functional.extend_onehot_prediction_to_logits(prediction)
+            ret[metric_name] = metric_function(ground_truth, self.predictions)
         success = True
+        if return_outputs:
+            return ret, success, {"groundtruth": ground_truth, "predicted": functional.compress_logits_prediction_to_onehot(prediction), "prob.": self.predictions}
         return ret, success
     
     def calibration_set(self):
@@ -148,3 +212,65 @@ class single_experimentor():
     
     def test_set(self):
         return self.triplet_dataset.test
+
+
+class prior_bias_experimentor(single_experimentor):
+    def __init__(self, 
+        triplet_dataset = None, 
+        original_dataset = None, 
+        k: int = 4, 
+        bias_type: str = "contextual", # "contextual" or "domain"
+        domain_query_length: int = 128,
+        metrics: dict = {
+            "entropy": functional.bias_mean_entropy_metric,
+            "distribution": functional.bias_mean_metric,
+        }, # DICT: {metric_name: metric_function}  metric_function: (ground_truth: list[int], prediction: list[list[float]] <logits>) -> float
+        repeat_times = configs.STANDARD_SETTINGS["test_times_for_each_test_sample"],
+        dividing = [configs.STANDARD_SETTINGS["calibration_number"], configs.STANDARD_SETTINGS["demonstration_number"], configs.STANDARD_SETTINGS["test_number"]], # A list of integers that divides the test samples into 3 splits. The first split will be used for calibration, the second split will be used for demonstration, and the third split will be used for testing. Only can be used when original_dataset is given.
+        noisy_channel = False # If True, the demonstration set will be generated by a noisy channel model.
+    ):
+        if bias_type not in ["contextual", "domain"]:
+            raise ValueError("bias_type should be 'contextual' or 'domain'.")
+        super().__init__(triplet_dataset, original_dataset, k, metrics, repeat_times, dividing, noisy_channel)
+        self.bias_type = bias_type
+        if bias_type == "contextual":
+            self.meanless_query = self._gen_empty_query()
+        elif bias_type == "domain":
+            self.meanless_query = self._gen_domain_query(self.triplet_dataset.demonstration, domain_query_length)
+        self.prompt_former = dataset_interface.prompt_writter(self.triplet_dataset, noisy_channel, self.meanless_query)
+
+    def _gen_empty_query(self):
+        while True:
+            yield ["" for _ in range(len(self.triplet_dataset.calibration[0][0]))]
+    
+    def _gen_domain_query(self, sample_set, sample_length):
+        my_random = stable_random.stable_random()
+        while True:
+            ret = []
+            for i in range(len(sample_set[0][0])):
+                output = []
+                while len(output) < sample_length:
+                    random_sample = sample_set[my_random.get_int_from_range(0, len(sample_set) - 1)][0][i]
+                    random_sample = random_sample.split(' ')
+                    random_index = my_random.get_int_from_range(0, len(random_sample) - 1)
+                    output.append(random_sample[random_index])
+                output = ' '.join(output)
+                ret.append(output)
+            yield ret
+
+
+class post_bias_experimentor(single_experimentor):
+    def __init__(self, 
+        triplet_dataset = None, 
+        original_dataset = None, 
+        k: int = 4, 
+        metrics: dict = {
+            "DL div.": functional.post_bias_dl_metric,
+            "distribution": functional.post_bias_dis_metric,
+        }, # DICT: {metric_name: metric_function}  metric_function: (ground_truth: list[int], prediction: list[list[float]] <logits>) -> float
+        repeat_times = configs.STANDARD_SETTINGS["test_times_for_each_test_sample"],
+        dividing = [configs.STANDARD_SETTINGS["calibration_number"], configs.STANDARD_SETTINGS["demonstration_number"], configs.STANDARD_SETTINGS["test_number"]], # A list of integers that divides the test samples into 3 splits. The first split will be used for calibration, the second split will be used for demonstration, and the third split will be used for testing. Only can be used when original_dataset is given.
+        noisy_channel = False # If True, the demonstration set will be generated by a noisy channel model.
+    ):
+        super().__init__(triplet_dataset, original_dataset, k, metrics, repeat_times, dividing, noisy_channel)
+        self.bias_type = "post"

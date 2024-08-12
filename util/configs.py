@@ -30,3 +30,78 @@ WARNING_SETTINGS = {
     "basic_dataset_template_protect": "You are editing the basic dataset template in the strict mode. Canceled.\n If you want to edit the prompt template, please edit the dataset_interface.prompt_writter.",
     "strict_mode_protect": "The setting can't be changed in the strict mode. Return to default."
 }
+
+PPL_ICL_INSTRUCTION_SETTINGS = {
+    # https://aclanthology.org/2023.findings-emnlp.679.pdf
+    # Use GPT-4 for paraphrase
+    "GLUE-SST2": [
+        "How would you describe the overall feeling of the movie based on this sentence? ",
+        "What mood does this sentence convey about the movie? ",
+        "What is the reviewer's opinion of the movie? ",
+        "What are the reviewer's thoughts on the movie? ",
+        "What impression does the reviewer have of the movie? "
+    ],
+    "rotten_tomatoes": [
+        "How would you describe the overall feeling of the movie based on this sentence? ",
+        "What mood does this sentence convey about the movie? ",
+        "What is the reviewer's opinion of the movie? ",
+        "What are the reviewer's thoughts on the movie? ",
+        "What impression does the reviewer have of the movie? "
+    ],
+    "financial_phrasebank": [
+        "What is the attitude towards the financial news in this sentence? ",
+        "What is the emotional response to the financial news in this sentence? ",
+        "What is the reaction to the financial news in this sentence? ",
+        "How does this sentence convey feelings about the financial news? ",
+        "How is the financial news perceived in this sentence? "
+    ],
+    "SST5": [
+        "How would you describe the overall feeling of the movie based on this sentence? ",
+        "What mood does this sentence convey about the movie? ",
+        "What is the reviewer's opinion of the movie? ",
+        "What are the reviewer's thoughts on the movie? ",
+        "What impression does the reviewer have of the movie? "
+    ],
+    "TREC": [
+        "What is the topic of the question?",
+        "What is the primary focus of this question? ",
+        "What is the central subject of this question? ",
+        "What does the question concern? ",
+        "What is the question addressing? "
+    ],
+    "AGNews": [
+        "What is the topic of the news? ",
+        "What is the news focused on? ",
+        "What is the subject of the news? ",
+        "What does the news cover? ",
+        "What is the news discussing? "
+    ],
+    "Subjective": [
+        "Does this sentence reflect a personal opinion? ",
+        "Is this sentence expressing a personal opinion or stating a fact? ",
+        "Is this sentence based on personal opinion or factual information? ",
+        "Is this sentence expressing a personal view or a factual statement? ",
+        "Is this sentence expressing a personal perspective or presenting objective facts? "
+    ],
+    "tweet_eval_emotion": [
+        "What feeling does this sentence convey? ",
+        "What emotion does this sentence express? ",
+        "What emotion is conveyed by this sentence? ",
+        "What is the emotional tone of this sentence? ",
+        "What is the mood reflected in this sentence? "
+    ],
+    "tweet_eval_hate": [
+        "Does this sentence contain hate speech? ",
+        "Is this sentence an example of hate speech? ",
+        "Does this sentence convey hateful language? ",
+        "Is this sentence indicative of hate speech? ",
+        "Does this sentence involve hate speech? "
+    ],
+    "hate_speech_18": [
+        "Does this sentence contain hate speech? ",
+        "Is this sentence an example of hate speech? ",
+        "Does this sentence convey hateful language? ",
+        "Is this sentence indicative of hate speech? ",
+        "Does this sentence involve hate speech? "
+    ],
+}
