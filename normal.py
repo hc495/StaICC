@@ -1,7 +1,7 @@
-from .util import experimentor
-from .util import hgf_dataset_loader
-from .util import functional
-from .util import configs
+from StaICC.util import experimentor
+from StaICC.util import hgf_dataset_loader
+from StaICC.util import functional
+from StaICC.util import configs
 import copy
 import warnings
 
@@ -18,7 +18,7 @@ ORIGINAL_DATA_LOADER_NORMAL = [
     hgf_dataset_loader.hate_speech_18,
 ]
 
-class benchmark():
+class Normal():
     def __init__(
         self, 
         k = 4,
@@ -34,6 +34,13 @@ class benchmark():
         self.experimentor = []
         self._original_data = []
         self._default_data = datasets
+        self._load_data()
+        self.metrics = metrics
+        self.noisy_channel = noisy_channel
+
+        self.re_initialize(k = k, noisy_channel = self.noisy_channel)
+    
+    def _load_data(self):
         print("Loading data...\n")
         count = 0
         for data_loader in self._default_data:
@@ -42,10 +49,6 @@ class benchmark():
             print("{} in {}".format(count, len(self._default_data)), "Data loaded: ", self._original_data[-1].get_dataset_name(), "\n")
 
         print("Data loaded successfully.\n")
-        self.metrics = metrics
-        self.noisy_channel = noisy_channel
-
-        self.re_initialize(k = k, noisy_channel = self.noisy_channel)
 
     def __call__(self, forward_inference: callable, return_divided_results = True, batched_inference = False):
         return self.auto_run(forward_inference, return_divided_results, batched_inference)

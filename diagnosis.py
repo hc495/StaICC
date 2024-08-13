@@ -1,8 +1,8 @@
-from . import normal
-from .util import configs, functional, experimentor
+from StaICC import normal
+from StaICC.util import configs, functional, experimentor
 import copy
 
-class triplet_bias():
+class Triplet_bias():
     def __init__(self):
         self.contextual = contextual_bias()
         self.domain = domain_bias()
@@ -23,7 +23,7 @@ class triplet_bias():
             "post": self.post.auto_run(list_of_forward_inference, return_divided_results, batched_inference)
         }
 
-class contextual_bias(normal.benchmark):
+class contextual_bias(normal.Normal):
     def __init__(
         self, 
         k = 4,
@@ -37,14 +37,7 @@ class contextual_bias(normal.benchmark):
         self.experimentor = []
         self._original_data = []
         self._default_data = datasets
-        print("Loading data...\n")
-        count = 0
-        for data_loader in self._default_data:
-            self._original_data.append(data_loader())
-            count += 1
-            print("{} in {}".format(count, len(self._default_data)), "Data loaded: ", self._original_data[-1].get_dataset_name(), "\n")
-
-        print("Data loaded successfully.\n")
+        self._load_data()
         self.metrics = metrics
         self.noisy_channel = noisy_channel
 
@@ -92,7 +85,7 @@ class contextual_bias(normal.benchmark):
         print("Ready.\n")
 
 
-class domain_bias(normal.benchmark):
+class domain_bias(normal.Normal):
     def __init__(
         self, 
         k = 4,
@@ -107,14 +100,7 @@ class domain_bias(normal.benchmark):
         self.experimentor = []
         self._original_data = []
         self._default_data = datasets
-        print("Loading data...\n")
-        count = 0
-        for data_loader in self._default_data:
-            self._original_data.append(data_loader())
-            count += 1
-            print("{} in {}".format(count, len(self._default_data)), "Data loaded: ", self._original_data[-1].get_dataset_name(), "\n")
-
-        print("Data loaded successfully.\n")
+        self._load_data()
         self.metrics = metrics
         self.noisy_channel = noisy_channel
         self.domain_query_length = domain_query_length
@@ -165,7 +151,7 @@ class domain_bias(normal.benchmark):
         print("Ready.\n")
 
 
-class post_bias(normal.benchmark):
+class post_bias(normal.Normal):
     def __init__(
         self, 
         k = 4,
@@ -180,14 +166,7 @@ class post_bias(normal.benchmark):
         self.experimentor = []
         self._original_data = []
         self._default_data = datasets
-        print("Loading data...\n")
-        count = 0
-        for data_loader in self._default_data:
-            self._original_data.append(data_loader())
-            count += 1
-            print("{} in {}".format(count, len(self._default_data)), "Data loaded: ", self._original_data[-1].get_dataset_name(), "\n")
-
-        print("Data loaded successfully.\n")
+        self._load_data()
         self.metrics = metrics
         self.noisy_channel = noisy_channel
         self.domain_query_length = domain_query_length
