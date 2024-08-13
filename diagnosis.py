@@ -4,9 +4,9 @@ import copy
 
 class Triplet_bias():
     def __init__(self):
-        self.contextual = contextual_bias()
-        self.domain = domain_bias()
-        self.post = post_bias()
+        self.contextual = Contextual_bias()
+        self.domain = Domain_bias()
+        self.post = Post_bias()
     
     def __call__(
         self, 
@@ -23,7 +23,7 @@ class Triplet_bias():
             "post": self.post.auto_run(list_of_forward_inference, return_divided_results, batched_inference)
         }
 
-class contextual_bias(normal.Normal):
+class Contextual_bias(normal.Normal):
     def __init__(
         self, 
         k = 4,
@@ -85,7 +85,7 @@ class contextual_bias(normal.Normal):
         print("Ready.\n")
 
 
-class domain_bias(normal.Normal):
+class Domain_bias(normal.Normal):
     def __init__(
         self, 
         k = 4,
@@ -151,7 +151,7 @@ class domain_bias(normal.Normal):
         print("Ready.\n")
 
 
-class post_bias(normal.Normal):
+class Post_bias(normal.Normal):
     def __init__(
         self, 
         k = 4,
