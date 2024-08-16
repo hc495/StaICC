@@ -143,6 +143,14 @@ class single_experimentor():
             raise ValueError("The length of each sample in the sampler should be equal to k.")
         self.demonstration_sampler = sampler
         self._repeat_times = 1
+    
+    def prompt_set(self):
+        ret = []
+        for time in range(self._repeat_times):
+            for index in range(len(self.triplet_dataset.test)):
+                prompt = self._get_prompts_for_test_sample(index, time)
+                ret.append(prompt)
+        return ret
 
     def auto_run(
         self, 

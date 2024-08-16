@@ -4,6 +4,7 @@ from . import configs
 import warnings
 import copy
 import pickle
+import pkgutil
 
 class basic_datasets_loader():
     # Interface for prompt_writer. 
@@ -35,6 +36,7 @@ class basic_datasets_loader():
         self._reducted_label_space = None # LIST of STRING. Reducted label space. Will be overloaded by the dataset.
         self._label_mapping = {} # DICT. INT to INT. Mapping from label index from _hgf_dataset to the label index of _label_space. Will be overloaded by the dataset.
         self.table = None # LIST of (LIST of STRING, STRING). The table form of the dataset. Will be create by _transform_hgf_dataset_to_table.
+        self._package_path = __package__[0:-5]
 
         self._long_text_classification = False
 
@@ -286,8 +288,9 @@ class glue_sst2(basic_datasets_loader):
             self._hgf_dataset = datasets.load_dataset("glue", "sst2")['train']
             self._complie_dataset()
         else:
-            pickle_file = open("./StaICC/cached_dataset/sst2.dataset", "rb")
-            self.table = pickle.load(pickle_file)
+            # with open("./StaICC/cached_dataset/sst2.dataset", "rb") as pickle_file:
+            pickle_file = pkgutil.get_data(self._package_path, 'cached_dataset/sst2.dataset')
+            self.table = pickle.loads(pickle_file)
     
     def _complie_dataset(self):
         self.table = []
@@ -318,8 +321,9 @@ class rotten_tomatoes(basic_datasets_loader):
             self._hgf_dataset = datasets.load_dataset("cornell-movie-review-data/rotten_tomatoes")['train']
             self._complie_dataset()
         else:
-            pickle_file = open("./StaICC/cached_dataset/rotten_tomatoes.dataset", "rb")
-            self.table = pickle.load(pickle_file)
+            # with open("./StaICC/cached_dataset/rotten_tomatoes.dataset", "rb") as pickle_file:
+            pickle_file = pkgutil.get_data(self._package_path, 'cached_dataset/rotten_tomatoes.dataset')
+            self.table = pickle.loads(pickle_file)
     
     def _complie_dataset(self):
         self.table = []
@@ -350,8 +354,9 @@ class financial_phrasebank(basic_datasets_loader):
             self._hgf_dataset = datasets.load_dataset("financial_phrasebank", "sentences_allagree")['train']
             self._complie_dataset()
         else:
-            pickle_file = open("./StaICC/cached_dataset/financial_phrasebank.dataset", "rb")
-            self.table = pickle.load(pickle_file)
+            # with open("./StaICC/cached_dataset/financial_phrasebank.dataset", "rb") as pickle_file:
+            pickle_file = pkgutil.get_data(self._package_path, 'cached_dataset/financial_phrasebank.dataset')
+            self.table = pickle.loads(pickle_file)
     
     def _complie_dataset(self):
         self.table = []
@@ -385,8 +390,9 @@ class sst5(basic_datasets_loader):
             self._hgf_dataset = datasets.load_dataset("SetFit/sst5", "sentences_allagree")['train']
             self._complie_dataset()
         else:
-            pickle_file = open("./StaICC/cached_dataset/sst5.dataset", "rb")
-            self.table = pickle.load(pickle_file)
+            # with open("./StaICC/cached_dataset/sst5.dataset", "rb") as pickle_file:
+            pickle_file = pkgutil.get_data(self._package_path, 'cached_dataset/sst5.dataset')
+            self.table = pickle.loads(pickle_file)
     
     def _complie_dataset(self):
         self.table = []
@@ -422,8 +428,9 @@ class trec(basic_datasets_loader):
             self._hgf_dataset = datasets.concatenate_datasets([self._hgf_dataset['train'], self._hgf_dataset['test']])
             self._complie_dataset()
         else:
-            pickle_file = open("./StaICC/cached_dataset/trec.dataset", "rb")
-            self.table = pickle.load(pickle_file)
+            # with open("./StaICC/cached_dataset/trec.dataset", "rb") as pickle_file:
+            pickle_file = pkgutil.get_data(self._package_path, 'cached_dataset/trec.dataset')
+            self.table = pickle.loads(pickle_file)
     
     def _complie_dataset(self):
         self.table = []
@@ -459,8 +466,9 @@ class agnews(basic_datasets_loader):
             self._hgf_dataset = datasets.concatenate_datasets([self._hgf_dataset['train'], self._hgf_dataset['test']])
             self._complie_dataset()
         else:
-            pickle_file = open("./StaICC/cached_dataset/agnews.dataset", "rb")
-            self.table = pickle.load(pickle_file)
+            # with open("./StaICC/cached_dataset/agnews.dataset", "rb") as pickle_file:
+            pickle_file = pkgutil.get_data(self._package_path, 'cached_dataset/agnews.dataset')
+            self.table = pickle.loads(pickle_file)
             
     def _complie_dataset(self):
         self.table = []
@@ -494,8 +502,9 @@ class subjective(basic_datasets_loader):
             self._hgf_dataset = datasets.load_dataset("SetFit/subj")['train']
             self._complie_dataset()
         else:
-            pickle_file = open("./StaICC/cached_dataset/subjective.dataset", "rb")
-            self.table = pickle.load(pickle_file)
+            # with open("./StaICC/cached_dataset/subjective.dataset", "rb") as pickle_file:
+            pickle_file = pkgutil.get_data(self._package_path, 'cached_dataset/subjective.dataset')
+            self.table = pickle.loads(pickle_file)
     
     def _complie_dataset(self):
         self.table = []
@@ -531,8 +540,9 @@ class tweet_eval_emotion(basic_datasets_loader):
             self._hgf_dataset = datasets.concatenate_datasets([self._hgf_dataset['train'], self._hgf_dataset['validation'], self._hgf_dataset['test']])
             self._complie_dataset()
         else:
-            pickle_file = open("./StaICC/cached_dataset/tweet_eval_emotion.dataset", "rb")
-            self.table = pickle.load(pickle_file)
+            # with open("./StaICC/cached_dataset/tweet_eval_emotion.dataset", "rb") as pickle_file:
+            pickle_file = pkgutil.get_data(self._package_path, 'cached_dataset/tweet_eval_emotion.dataset')
+            self.table = pickle.loads(pickle_file)
 
     def _complie_dataset(self):
         self.table = []
@@ -566,8 +576,9 @@ class tweet_eval_hate(basic_datasets_loader):
             self._hgf_dataset = datasets.load_dataset("tweet_eval", "hate")['train']
             self._complie_dataset()
         else:
-            pickle_file = open("./StaICC/cached_dataset/tweet_eval_hate.dataset", "rb")
-            self.table = pickle.load(pickle_file)
+            # with open("./StaICC/cached_dataset/tweet_eval_hate.dataset", "rb") as pickle_file:
+            pickle_file = pkgutil.get_data(self._package_path, 'cached_dataset/tweet_eval_hate.dataset')
+            self.table = pickle.loads(pickle_file)
 
     def _complie_dataset(self):
         self.table = []
@@ -602,8 +613,9 @@ class hate_speech_18(basic_datasets_loader):
             self._hgf_dataset = datasets.load_dataset("hate_speech18")['train']
             self._complie_dataset()
         else:
-            pickle_file = open("./StaICC/cached_dataset/hate_speech_18.dataset", "rb")
-            self.table = pickle.load(pickle_file)
+            # with open("./StaICC/cached_dataset/hate_speech_18.dataset", "rb") as pickle_file:
+            pickle_file = pkgutil.get_data(self._package_path, 'cached_dataset/hate_speech_18.dataset')
+            self.table = pickle.loads(pickle_file)
 
     def _complie_dataset(self):
         self.table = []

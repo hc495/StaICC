@@ -1,7 +1,7 @@
-from StaICC.util import experimentor
-from StaICC.util import hgf_dataset_loader
-from StaICC.util import functional
-from StaICC.util import configs
+from .util import experimentor
+from .util import hgf_dataset_loader
+from .util import functional
+from .util import configs
 import copy
 import warnings
 

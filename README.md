@@ -20,10 +20,12 @@ We ensure that under normal usage, this library only relies on Python's default 
 You can only download a release pack of StaICC and unfold it into your work path with the top folder `StaICC` in your work path, like:
 
 ```
----- work_path
- |-- StaICC
- |-- experiment_code.py
- ...
+--- work_path
+ |--- StaICC
+ | |- __init__.py
+ | |- ...
+ |--- experiment_code.py
+ |--- ...
 ```
 
 Also, we release PyPl package `StaICC`. You can use:
@@ -51,12 +53,12 @@ A standard process of the usage of StaICC is shown as below.
 
 You should write a function or partial function with a prototype `my_function(prompt, label_space)`. Make sure the name of the formal parameter is consistent with the above. __Typically__, the parameter `prompt` is fed with a `str` variable with a ICL-formatted string, and the `label_space` is fed with a `list[str]` to describe which token in the vocabulary should the model focus as the label.
 
-You can refer to the functions in `prefabricate_inference/model_kernel.py` as examples. Also, as a quick start, you can reload these functions by `functools.partial` like:
+You can refer to the functions in `prefabricate_inference/model_kernel.py` as examples. Also, as a quick start, you can reload these functions by `functools.partial` like (if you import `StaICC.prefabricate_inference.model_kernel`, make sure you have dependencies of `torch` and `transformers >= 4.43` ):
 
 ```python
 from transformers import AutoTokenizer, AutoModelForCausalLM
 
-tokenizer = AutoTokenizer.from_pretrained("<huggingface_model_name>")
+tokenizer = AutoTokenizer.from_pretrained("<huggingface_model_name>") 
 model = AutoModelForCausalLM.from_pretrained("<huggingface_model_name>").cuda()
 
 from StaICC.prefabricate_inference import model_kernel
@@ -114,7 +116,11 @@ A typical output is a dictionary as:
 We support the following custom settings of expeirment.
 
 1. [Demonstration numbers k](#k)
-2. [Different inference function for different dataset](#list_inference)
+2. [Custom prompt template]
+3. [Custom demonstration examples for each test sample]
+4. [Use batched inference]
+5. [Different inference function for different dataset](#list_inference)
+6. [Use output calibration]
 
 <span id="k"></span>
 
@@ -134,7 +140,7 @@ We support the following custom settings of expeirment.
 
 ## Benchmark Results
 
-You are welcome to use issue to report your own results.
+You are welcome to use issue to report your own results. 
 
 See 'issue' for further information.
 

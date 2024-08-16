@@ -1,5 +1,5 @@
-from StaICC import normal
-from StaICC.util import configs, functional, experimentor
+from . import normal
+from .util import configs, functional, experimentor
 import copy
 
 class Triplet_bias():
