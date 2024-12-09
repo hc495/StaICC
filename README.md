@@ -40,10 +40,43 @@ to install this library.
 
 ### Sub-benchmarks
 
+`StaICC` provides several sub-benchmarks for in-context classification evaluations. The following table shows the sub-benchmarks we provide:
+
 | Name | Import name | Describe |
 |:---:|:---:|:---:|
 | StaICC-Normal | `from StaICC import Normal` | A standard classification accuracy-based benchmark for normal classification tasks. |
 | StaICC-Diagnosis: Bias | `from StaICC import Triplet_bias` | A prediction logits bias (3 types) detector. |
+
+#### StaICC-Normal
+
+`StaICC-Normal` is a standard classification accuracy-based benchmark for normal classification tasks. It returns the averaged metrics of accuracy, averaged truelabel likelihood, macro F1, and expected calibration error.
+
+#### StaICC-Diagnosis: Bias
+
+`StaICC-Diagnosis: Bias` is a prediction logits bias detector of 3 types:
+
+1. **Contextual Bias**: Introduced by [Calibrate Before Use: Improving Few-Shot Performance of Language Models](https://arxiv.org/abs/2106.06328), contextual bias measures the bias when some demonstrations and an empty query is fed into the model. We use the entropy of the averaged prediction probabilites as the metric.
+
+2. **Domainal Bias**: Introduced by [Mitigating Label Biases for In-context Learning](http://arxiv.org/abs/2305.19148), domainal bias measures the bias when some demonstrations and a query of randomly sampled tokens from the test dataset is fed into the model. We use the entropy of the averaged prediction probabilites as the metric.
+
+3. **Posterior Bias**: 
+
+### Datasets
+
+In StaICC, we use the following original datasets:
+
+|Index| Name | Task | Label Space | Citation |
+|:---:|:---:|:---:|:---:|:---:|
+|0|GLUE-SST2 | Sentiment Classification | negative, positive | https://aclanthology.org/D13-1170/|
+|1|Rotten Tomatoes | Sentiment Classification | negative, positive | https://arxiv.org/abs/cs/0506075|
+|2|Financial Phrasebank | Sentiment Classification | negative, neutral, positive | https://arxiv.org/abs/1307.5336|
+|3|SST5 | Sentiment Classification | very negative, negative, neutral, positive, very positive | https://aclanthology.org/D13-1170/|
+|4|TREC | Topic Classification | abbreviation, entity, description and abstract concept, human being, location, numeric value | https://www.aclweb.org/anthology/C02-1150|
+|5|AGNews | Topic Classification | world, sports, business, sci/tech | https://arxiv.org/abs/1509.01626|
+|6|Subjective | Subjectivity Classification | objective, subjective|https://dl.acm.org/doi/10.5555/2390665.2390688|
+|7|Tweet Eval Emotion | Sentiment Classification | anger, joy, optimism, sadness|https://aclanthology.org/S18-1001/|
+|8|Tweet Eval Hate |Hate Speech Classification | non-hate, hate|https://aclanthology.org/S19-2007/|
+|9|Hate Speech 18	|Hate Speech Classification| noHate, hate, idk/skip, relation| - |
 
 ## Quick Start
 
@@ -53,16 +86,15 @@ A standard process of the usage of StaICC is shown as below.
 
 You should write a function or partial function with a prototype `my_function(prompt, label_space)`. Make sure the name of the formal parameter is consistent with the above. __Typically__, the parameter `prompt` is fed with a `str` variable with a ICL-formatted string, and the `label_space` is fed with a `list[str]` to describe which token in the vocabulary should the model focus as the label.
 
-You can refer to the functions in `prefabricate_inference/model_kernel.py` as examples. Also, as a quick start, you can reload these functions by `functools.partial` like (if you import `StaICC.prefabricate_inference.model_kernel`, make sure you have dependencies of `torch` and `transformers >= 4.43` ):
+You can refer to the functions in `prefabricate_inference/model_kernel.py` as examples. Also, as a quick start, you can reload these functions by `functools.partial` as shown below. (if you import `StaICC.prefabricate_inference.model_kernel`, make sure you have dependencies of `torch` and `transformers >= 4.43`)
 
 ```python
 from transformers import AutoTokenizer, AutoModelForCausalLM
+from StaICC.prefabricate_inference import model_kernel
+import functools
 
 tokenizer = AutoTokenizer.from_pretrained("<huggingface_model_name>") 
 model = AutoModelForCausalLM.from_pretrained("<huggingface_model_name>").cuda()
-
-from StaICC.prefabricate_inference import model_kernel
-import functools
 
 my_inference = functools.partial(
     model_kernel.standard_ICL_inference_with_torch_Causal_LM, 
@@ -113,30 +145,52 @@ A typical output is a dictionary as:
 
 ## Custom Experiment
 
-We support the following custom settings of expeirment.
+In our implementation, we use one `experimentor` object for each dataset. So, you can customize your experiment by setting the parameters of the `experimentor` object. One you load a sub-benchmark like `Normal`, you can access the `experimentor` object by `benchmark[dataset_index]`. For example, you can access the `experimentor` object of the `GLUE-SST2` dataset by `Normal[0]`.
 
-1. [Demonstration numbers k](#k)
-2. [Custom prompt template]
-3. [Custom demonstration examples for each test sample]
-4. [Use batched inference]
-5. [Different inference function for different dataset](#list_inference)
-6. [Use output calibration]
+When you access the `experimentor`, you can control the experiment. We support the following custom settings of experiment with respect to each step in the ICL pipeline:
 
-<span id="k"></span>
+### Demonstration Sampling
 
-### Use various demonstration numbers in your experiment
+#### Various Demonstration Numbers
 
+You are recommended to define the demonstration number in the initialization of the sub-benchmark. The default value is 4, and you can set the `k` parameter in the instantiation of the sub-benchmark.
 
+For example:
 
+```python
+from StaICC import Normal
+benchmark = Normal(k = 16)
+```
+
+- We didn't set a upper limit for this parameter, but some of the demonstrations may be repeated if the `k` exceed the existing number of the demonstration samples.
+
+Also, you can set the expected demonstration number after the initialization by `experimentor.set_k(k)`.
+
+#### Manual Demonstration Sampling
+
+You can use `experimentor.set_demonstration_sampler(sampler)` function to manually sample the demonstrations for each test sample. You can input any list-styled object `sampler` with the same length as the test samples, and each element in your `sampler` should be a list of indices of the demonstrations you want to use for the corresponding test sample, in sequence.
+
+In this processing, you are likely to need access to these demonstration and test sets. You can access them by `experimentor.demonstration_set` and `experimentor.test_set`. An example is shown [below](prompt_sample).
+
+- Notice that setting a `sampler` will set the repeat experiment times from 2 to 1.
+
+- To reset the `sampler` to default, you can call `experimentor.reset_demonstration_sampler()`.
+
+## Examples
+
+<span id="prompt_sample"></span>
+
+### Use manual demonstration sequence in your experiment
 
 <span id="list_inference"></span>
+
+As an example, we repeat the k-NN demonstration experiment proposed by paper [What Makes Good In-Context Examples for GPT-3?](https://arxiv.org/abs/2101.06804). 
 
 ### Use different inference function for each dataset
 
 
 
 
-## Examples
 
 ## Benchmark Results
 

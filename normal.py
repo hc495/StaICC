@@ -138,7 +138,7 @@ class Normal():
         for i, single_experimentor in enumerate(self.experimentor):
             count += 1
             print("\n\nExperiment {} in {}".format(count, len(self.experimentor)))
-            temp_res, success = single_experimentor(list_of_forward_inference[i], batched_inference)
+            temp_res, success = single_experimentor(forward_inference = list_of_forward_inference[i], batched_inference = batched_inference)
             ret_divided[single_experimentor.triplet_dataset.dataset_name] = temp_res
             if not success:
                 warnings.warn("The experimentor on the dataset " + single_experimentor.triplet_dataset.get_dataset_name() + " failed.")

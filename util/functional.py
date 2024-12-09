@@ -10,6 +10,18 @@ def L2_dist(x, y):
         raise ValueError("The length of x and y should be the same.")
     return sum([(x_i - y_i) ** 2 for x_i, y_i in zip(x, y)]) ** 0.5
 
+def linear_regression(x, y):
+    if len(x) != len(y):
+        raise ValueError("The length of x and y should be the same.")
+    n = len(x)
+    sum_x = sum(x)
+    sum_y = sum(y)
+    sum_x_square = sum([x_i ** 2 for x_i in x])
+    sum_xy = sum([x_i * y_i for x_i, y_i in zip(x, y)])
+    a = (n * sum_xy - sum_x * sum_y) / (n * sum_x_square - sum_x ** 2)
+    b = (sum_y - a * sum_x) / n
+    return a, b
+
 def two_d_list_mean(x):
     sum = [0] * len(x[0])
     for x_i in x:

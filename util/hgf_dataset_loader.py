@@ -59,7 +59,7 @@ class basic_datasets_loader():
         # Should return the number of elements in the dataset.
         return len(self.table)
 
-    def __getitem__(self, index: int):
+    def __getitem__(self, index: int) -> tuple[list[str], str]:
         # Should return a (list of strings, string). 
         # list of string: The length is the number of input elements.
         # string: The label.

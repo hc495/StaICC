@@ -89,7 +89,7 @@ class triplet_dataset():
             raise ValueError("Index out of range.")
         return self.test.get_label(index)
     
-    def get_default_ground_truth_label_from_index(self, index):
+    def get_default_ground_truth_label_from_index(self, index) -> int:
         if index < 0 or index >= len(self.test):
             raise ValueError("Index out of range.")
         return self.test.find_index_from_label(self.get_default_ground_truth_label(index))
@@ -167,12 +167,15 @@ class demonstration_sampler():
         self._sampled_indexes = []
         self._complie()
     
+    def _get_next_sample(self):
+        if self._k > self._demonstration_set_size:
+            return self._random.sample_index_set(self._k, self._demonstration_set_size, True)
+        else:
+            return self._random.sample_index_set(self._k, self._demonstration_set_size, False)
+    
     def _complie(self):
         for i in range(self._query_numbers):
-            if self._k > self._demonstration_set_size:
-                self._sampled_indexes.append(self._random.sample_index_set(self._k, self._demonstration_set_size, True))
-            else:
-                self._sampled_indexes.append(self._random.sample_index_set(self._k, self._demonstration_set_size, False))
+            self._sampled_indexes.append(self._get_next_sample())
 
     def __len__(self) -> int:
         return len(self._sampled_indexes)
@@ -190,6 +193,32 @@ class demonstration_sampler():
 
     def __repr__(self):
         return self.__str__()
+    
+    def _pop(self, index: int) -> list[int]:
+        if index < 0 or index >= self._query_numbers:
+            raise ValueError("Index out of range.")
+        ret = self._sampled_indexes[index]
+        self._sampled_indexes.pop(index)
+        return ret
+    
+    def _insert(self, index: int, value: list[int]) -> None:
+        if index < 0 or index > self._query_numbers:
+            raise ValueError("Index out of range.")
+        if len(value) != self._k:
+            raise ValueError("The length of the value should be equal to k.")
+        self._sampled_indexes.insert(index, value)
+    
+    def _append(self, value: list[int]) -> None:
+        if len(value) != self._k:
+            raise ValueError("The length of the value should be equal to k.")
+        self._sampled_indexes.append(value)
+
+    def _set_sample(self, index, value: list[int]) -> None:
+        if index < 0 or index >= self._query_numbers:
+            raise ValueError("Index out of range.")
+        if len(value) != self._k:
+            raise ValueError("The length of the value should be equal to k.")
+        self._sampled_indexes[index] = value
     
     def get_sampled_indexes(self, index) -> list[int]:
         if index < 0 or index >= self._query_numbers:
@@ -264,7 +293,11 @@ class prompt_writter():
         self._random_for_example = stable_random.stable_random()
         self._noisy_channel = False
         self._random_for_label_error = stable_random.stable_random()
+        self.label_wrong_rate = 0
     
+    def set_label_wrong_rate(self, label_wrong_rate: float):
+        self.label_wrong_rate = label_wrong_rate
+
     def use_noisy_channel(self, new_label_affix = " ", new_last_input_affix = "\n"):
         self._noisy_channel = True
         self._label_affix = new_label_affix
@@ -311,8 +344,6 @@ class prompt_writter():
         for prefix in input_text_prefixes:
             if type(prefix) is not str:
                 raise ValueError("Input text prefixes should be a list of strings.")
-        if len(input_text_prefixes) != self.input_element_numbers:
-            raise ValueError("The number of input text prefixes should be equal to the number of input elements.")
         self._input_text_prefixes = input_text_prefixes
     
     def change_input_text_affixes(self, input_text_affixes: list[str]):
@@ -353,14 +384,14 @@ class prompt_writter():
                 raise ValueError("Label space should be a list of strings.")
         self._label_space = label_space
     
-    def write_prompt(self, demos_indexes: list[int], query_index: int, label_wrong_rate = 0.0):
+    def write_prompt(self, demos_indexes: list[int], query_index: int):
         # Use the indexes of the demonstrations and the query to write a prompt.
         # demos_indexes: [demo1, demo2, ..., demok]
         # query_index: query
-        if label_wrong_rate < 0 or label_wrong_rate > 1:
+        if self.label_wrong_rate < 0 or self.label_wrong_rate > 1:
             raise ValueError("The label wrong rate should be in [0, 1].")
-        wrong_label_number = int(len(demos_indexes) * label_wrong_rate)
-        if wrong_label_number / len(demos_indexes) != label_wrong_rate:
+        wrong_label_number = int(len(demos_indexes) * self.label_wrong_rate)
+        if wrong_label_number != 0 and wrong_label_number / len(demos_indexes) != self.label_wrong_rate:
             warnings.warn("The number of wrong labels is not an integer.")
         demo_lines = []
         query_line = []

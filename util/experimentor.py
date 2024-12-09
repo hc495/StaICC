@@ -94,8 +94,8 @@ class single_experimentor():
     def __len__(self):
         return len(self.triplet_dataset.test) * self._repeat_times
 
-    def __call__(self, forward_inference: callable, batched_inference = False, return_outputs = False):
-        return self.auto_run(forward_inference, batched_inference, return_outputs)
+    def __call__(self, forward_inference: callable = None, input_prediction = None, batched_inference = False, return_outputs = False):
+        return self.auto_run(forward_inference, preentered_prediction = input_prediction, batched_inference = batched_inference, return_outputs = return_outputs)
     
     def __str__(self) -> str:
         ret = ("--- single experimentor ---\n" +
@@ -112,14 +112,78 @@ class single_experimentor():
 
     def _get_prompts_for_test_sample(self, test_sample_index: int, repeat_time: int):
         # repeat_time_from_0
-        demos_indexes = self.demonstration_sampler[test_sample_index + repeat_time * len(self.triplet_dataset.test)]
+        index = test_sample_index + repeat_time * len(self.triplet_dataset.test)
+        demos_indexes = self.demonstration_sampler[index]
+        if len(demos_indexes) != self._k:
+            warnings.warn("The length of the demonstration indexes should be equal to k, in test index: " + str(index))
         return self.prompt_former.write_prompt(demos_indexes, test_sample_index)
+
+    def set_k(self, k: int):
+        self.reset_demonstration_sampler()
+        self._k = k
+        self.demonstration_sampler = dataset_interface.demonstration_sampler(self._k, len(self.triplet_dataset.demonstration), self._repeat_times * len(self.triplet_dataset.test))
+        self._default_demonstration_sampler = copy.deepcopy(self.demonstration_sampler)
 
     def get_k(self):
         return self._k
     
     def get_repeat_times(self):
         return self._repeat_times
+    
+    def set_out_of_domain_mode(self):
+        self.reset_demonstration_sampler()
+        # wash the demonstration sampler
+        wash_list = []
+        for i in range(len(self.triplet_dataset.test) * self._repeat_times):
+            label = self.triplet_dataset.get_default_ground_truth_label_from_index(i % len(self.triplet_dataset.test))
+            demonstration_indexes = self.demonstration_sampler[i]
+            for index in demonstration_indexes:
+                if self.triplet_dataset.demonstration.find_index_from_label(self.triplet_dataset.demonstration[index][1]) == label:
+                    wash_list.append(i)
+                    break
+
+        for i in wash_list:
+            label = self.triplet_dataset.get_default_ground_truth_label_from_index(i % len(self.triplet_dataset.test))
+            success = False
+            while True:
+                success = True
+                new_sample = self.demonstration_sampler._get_next_sample()
+                for index in new_sample:
+                    if self.triplet_dataset.demonstration.find_index_from_label(self.triplet_dataset.demonstration[index][1]) == label:
+                        success = False
+                        break
+                if success:
+                    break
+            self.demonstration_sampler._set_sample(i, new_sample)
+
+    def set_in_domain_mode(self):
+        self.reset_demonstration_sampler()
+        # wash the demonstration sampler
+        wash_list = []
+        for i in range(len(self.triplet_dataset.test) * self._repeat_times):
+            label = self.triplet_dataset.get_default_ground_truth_label_from_index(i % len(self.triplet_dataset.test))
+            demonstration_indexes = self.demonstration_sampler[i]
+            label_exist = False
+            for index in demonstration_indexes:
+                if self.triplet_dataset.demonstration.find_index_from_label(self.triplet_dataset.demonstration[index][1]) == label:
+                    label_exist = True
+                    break
+            if not label_exist:
+                wash_list.append(i)
+
+        for i in wash_list:
+            label = self.triplet_dataset.get_default_ground_truth_label_from_index(i % len(self.triplet_dataset.test))
+            success = False
+            while True:
+                success = False
+                new_sample = self.demonstration_sampler._get_next_sample()
+                for index in new_sample:
+                    if self.triplet_dataset.demonstration.find_index_from_label(self.triplet_dataset.demonstration[index][1]) == label:
+                        success = True
+                        break
+                if success:
+                    break
+            self.demonstration_sampler._set_sample(i, new_sample)
 
     def reset_demonstration_sampler(self):
         self.demonstration_sampler = copy.deepcopy(self._default_demonstration_sampler)
@@ -154,9 +218,10 @@ class single_experimentor():
 
     def auto_run(
         self, 
-        forward_inference: callable, 
+        forward_inference: callable = None, 
             # When batched_inference is disabled, forward_inference: (prompt: str, label_space: list[str]) -> list[float] <logits> or int <label>. The inputted parameter signs are fixed to prompt and label_space.
             # When batched_inference is enabled, forward_inference: (prompts: list[str], label_space: list[str]) -> list[list[float]] <logits> or list[int] <label>.
+        preentered_prediction = None, # The prediction for the test set (list[int]). If None, the prediction will be calculated by the forward_inference.
         batched_inference = False, # for batched inference like BatchCalibration.
             # If enabled, we will input all the prompts into the forward_inference; and if disabled, we will input the prompt into the forward_inference one by one
         return_outputs = False # If True, the outputs will be returned.
@@ -164,7 +229,6 @@ class single_experimentor():
         # The forward_inference function should be a callable that takes a prompt and returns a list of label logits or a label index.
         # We encourage the forward_inference function to be a function that takes a prompt and returns a list of logits for each label, so that we can calculate more metrics.
         # >> If you use a function that returns a label index, the metrics that require logits will be calculated as if the logits are one-hot encoded.
-        print("\nStart testing the forward inference function " + str(forward_inference) + " on the dataset: " + str(self.triplet_dataset.test.dataset_name) + " with bias type: " + self.bias_type + ".\n")
         success = False
         if self._k > len(self.triplet_dataset.demonstration):
             warnings.warn("The k value is larger than the length of the demonstration dataset. Return all-0 results.")
@@ -177,30 +241,40 @@ class single_experimentor():
         total_samples = len(self.triplet_dataset.test) * self._repeat_times
 
         # INFERENCE
-        if not batched_inference:
-            # Iterative inference: forward_inference: (prompt: str, label_space: list[str]) -> list[float] <logits> or int <label>. Inferring one by one.
+        if preentered_prediction is None and forward_inference is not None:
+            print("\nStart testing the forward inference function " + str(forward_inference) + " on the dataset: " + str(self.triplet_dataset.test.dataset_name) + " with bias type: " + self.bias_type + ".\n")
+            if not batched_inference:
+                # Iterative inference: forward_inference: (prompt: str, label_space: list[str]) -> list[float] <logits> or int <label>. Inferring one by one.
+                for time in range(self._repeat_times):
+                    for index in range(len(self.triplet_dataset.test)):
+                        prompt = self._get_prompts_for_test_sample(index, time)
+                        result = forward_inference(prompt = prompt, label_space = self.triplet_dataset.get_label_space()) # The inputted parameter signs are fixed to prompt and label_space.
+                        ground_truth.append(self.triplet_dataset.get_default_ground_truth_label_from_index(index))
+                        self.label_dis[ground_truth[-1]] += 1
+                        prediction.append(result)
+                        print("\r", end="")
+                        print("Process: {}%, {} in {}".format(
+                            int((index + time * len(self.triplet_dataset.test) + 1) / total_samples * 100), 
+                            (index + time * len(self.triplet_dataset.test) + 1), 
+                            total_samples
+                        ), ">>" * int((index + time * len(self.triplet_dataset.test)) / total_samples * 32), end="")
+            else:
+                # Batched inference: forward_inference: (prompts: list[str], label_space: list[str]) -> list[list[float]] <logits> or list[int] <label>. Inferring all at once
+                prompts = []
+                for time in range(self._repeat_times):
+                    for index in range(len(self.triplet_dataset.test)):
+                        prompts.append(self._get_prompts_for_test_sample(index, time))
+                        ground_truth.append(self.triplet_dataset.get_default_ground_truth_label_from_index(index))
+                        self.label_dis[ground_truth[-1]] += 1
+                prediction = forward_inference(prompt = prompts, label_space = self.triplet_dataset.get_label_space())
+        elif preentered_prediction is not None:
             for time in range(self._repeat_times):
                 for index in range(len(self.triplet_dataset.test)):
-                    prompt = self._get_prompts_for_test_sample(index, time)
-                    result = forward_inference(prompt = prompt, label_space = self.triplet_dataset.get_label_space()) # The inputted parameter signs are fixed to prompt and label_space.
                     ground_truth.append(self.triplet_dataset.get_default_ground_truth_label_from_index(index))
                     self.label_dis[ground_truth[-1]] += 1
-                    prediction.append(result)
-                    print("\r", end="")
-                    print("Process: {}%, {} in {}".format(
-                        int((index + time * len(self.triplet_dataset.test) + 1) / total_samples * 100), 
-                        (index + time * len(self.triplet_dataset.test) + 1), 
-                        total_samples
-                    ), ">>" * int((index + time * len(self.triplet_dataset.test)) / total_samples * 32), end="")
+            prediction = preentered_prediction
         else:
-            # Batched inference: forward_inference: (prompts: list[str], label_space: list[str]) -> list[list[float]] <logits> or list[int] <label>. Inferring all at once
-            prompts = []
-            for time in range(self._repeat_times):
-                for index in range(len(self.triplet_dataset.test)):
-                    prompts.append(self._get_prompts_for_test_sample(index, time))
-                    ground_truth.append(self.triplet_dataset.get_default_ground_truth_label_from_index(index))
-                    self.label_dis[ground_truth[-1]] += 1
-            prediction = forward_inference(prompt = prompts, label_space = self.triplet_dataset.get_label_space())
+            raise ValueError("You should provide either the forward_inference function or the input_prediction.")
 
         # TEST
         ret = {}
@@ -282,3 +356,94 @@ class post_bias_experimentor(single_experimentor):
     ):
         super().__init__(triplet_dataset, original_dataset, k, metrics, repeat_times, dividing, noisy_channel)
         self.bias_type = "post"
+
+
+class sensitivity_experimentor(single_experimentor):
+    def __init__(self, 
+        triplet_dataset = None, 
+        original_dataset = None, 
+        k: int = 4, 
+        sensitivity_test = 5,
+        metrics: dict = {
+            "accuracy": functional.accuracy,
+            "averaged_truelabel_likelihood": functional.averaged_truelabel_likelihood,
+            "macro_F1": functional.macro_F1,
+            "expected_calibration_error_1": functional.expected_calibration_error_1
+        }, # DICT: {metric_name: metric_function}  metric_function: (ground_truth: list[int], prediction: list[list[float]] <logits>) -> float
+        repeat_times = configs.STANDARD_SETTINGS["test_times_for_each_test_sample"],
+        dividing = [configs.STANDARD_SETTINGS["calibration_number"], configs.STANDARD_SETTINGS["demonstration_number"], configs.STANDARD_SETTINGS["test_number"]], # A list of integers that divides the test samples into 4 splits. The first split will be used for calibration, the second split will be used for demonstration, the third split will be used for testing, and the fourth split will be used for sensitivity test. Only can be used when original_dataset is given.
+        noisy_channel = False # If True, the demonstration set will be generated by a noisy channel model.
+    ):
+        super().__init__(triplet_dataset, original_dataset, k, metrics, repeat_times, dividing, noisy_channel)
+        self.test_times = sensitivity_test
+    
+    def _sensitivity_init(self):
+        pass
+
+    def _sensitivity_step(self):
+        pass
+
+    def inference_run(self, forward_inference: callable, batched_inference=False):
+        result_dicts = []
+        self._sensitivity_init()
+        for i in range(self.test_times):
+            result_dicts.append(super().auto_run(forward_inference = forward_inference, batched_inference = batched_inference)[0])
+            self._sensitivity_step()
+        return result_dicts
+
+
+class GLER_experimentor(sensitivity_experimentor):
+    def __init__(self, 
+        triplet_dataset = None, 
+        original_dataset = None, 
+        k: int = 4, 
+        sensitivity_test = 5,
+        metrics: dict = {
+            "accuracy": functional.accuracy,
+            "averaged_truelabel_likelihood": functional.averaged_truelabel_likelihood,
+            "macro_F1": functional.macro_F1,
+            "expected_calibration_error_1": functional.expected_calibration_error_1
+        }, # DICT: {metric_name: metric_function}  metric_function: (ground_truth: list[int], prediction: list[list[float]] <logits>) -> float
+        repeat_times = configs.STANDARD_SETTINGS["test_times_for_each_test_sample"],
+        dividing = [configs.STANDARD_SETTINGS["calibration_number"], configs.STANDARD_SETTINGS["demonstration_number"], configs.STANDARD_SETTINGS["test_number"]], # A list of integers that divides the test samples into 4 splits. The first split will be used for calibration, the second split will be used for demonstration, the third split will be used for testing, and the fourth split will be used for sensitivity test. Only can be used when original_dataset is given.
+        noisy_channel = False # If True, the demonstration set will be generated by a noisy channel model.
+    ):
+        super().__init__(triplet_dataset, original_dataset, k, sensitivity_test, metrics, repeat_times, dividing, noisy_channel)
+        if sensitivity_test < 2:
+            raise ValueError("The sensitivity test should be larger than 1.")
+        self.current_error_rate = 0
+
+    def _sensitivity_init(self):
+        self.current_error_rate = 0
+        self.prompt_former.set_label_wrong_rate(self.current_error_rate)
+
+    def _sensitivity_step(self):
+        self.current_error_rate += 1 / (self.test_times - 1)
+        self.prompt_former.set_label_wrong_rate(self.current_error_rate)
+    
+    def auto_run(
+        self, 
+        forward_inference: callable, 
+            # When batched_inference is disabled, forward_inference: (prompt: str, label_space: list[str]) -> list[float] <logits> or int <label>. The inputted parameter signs are fixed to prompt and label_space.
+            # When batched_inference is enabled, forward_inference: (prompts: list[str], label_space: list[str]) -> list[list[float]] <logits> or list[int] <label>.
+        input_prediction = None, # Unused
+        batched_inference = False, # for batched inference like BatchCalibration.
+            # If enabled, we will input all the prompts into the forward_inference; and if disabled, we will input the prompt into the forward_inference one by one
+        return_outputs = False # Unused
+    ):
+        result_dicts = {}
+        sensitivity_dict = {}
+        intermidiate_results = self.inference_run(forward_inference, batched_inference)
+        arguments = [1]
+        for i in range(1, self.test_times):
+            arguments.append(arguments[-1] - i / (self.test_times - 1))
+        for i in range(self.test_times):
+            result_dicts[str(i)] = intermidiate_results[i]
+        for metric_name, metric_function in self.metrics.items():
+            temp_results = []
+            for i in range(len(intermidiate_results)):
+                res = intermidiate_results[i]
+                temp_results.append(res[metric_name])
+            sensitivity_dict[metric_name] = functional.linear_regression(arguments, temp_results)
+        result_dicts["sensitivity"] = sensitivity_dict
+        return result_dicts, True
