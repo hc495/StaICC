@@ -82,9 +82,10 @@ class triplet_dataset():
         return self.dataset_name
     
     def get_label_space(self):
-        return self.demonstration.get_label_space()
+        # Return a deep copy of the label space.
+        return copy.deepcopy(self.demonstration.get_label_space())
 
-    def get_default_ground_truth_label(self, index):
+    def get_default_ground_truth_label(self, index) -> str:
         if index < 0 or index >= len(self.test):
             raise ValueError("Index out of range.")
         return self.test.get_label(index)
@@ -236,7 +237,7 @@ class prompt_writter():
             __init__:
                 - triplet_dataset: triplet_dataset; the triplet dataset.
                 - use_noisy_channel: bool; whether to use the noisy channel mode (with a prompt like <label><text><label><text>...).
-            prompt_writter.use_default_settings(): None; set the prompt writter to the default template defined by the original dataset (`triplet_dataset`).
+            prompt_writter.reset(): None; set the prompt writter to the default template defined by the original dataset (`triplet_dataset`).
             prompt_writter.use_noisy_channel(new_label_affix = " ", new_last_input_affix = "\n"): None; set the prompt writter to the noisy channel mode. The label affix and the last_input_affix can be changed.
             prompt_writter.get_label_of_test_samples(query_index: int): str; get the label word of the `index`-th examples defined by the `hgf_dataset_loader.basic_datasets_loader` of the test set.
             change: 
@@ -277,12 +278,12 @@ class prompt_writter():
             pseudo_query_generater = None,
         ):
         self._triplet_dataset = triplet_dataset
-        self.use_default_settings()
+        self.reset()
         if use_noisy_channel:
             self.use_noisy_channel()
         self.pseudo_prompt = pseudo_query_generater
     
-    def use_default_settings(self):
+    def reset(self):
         self._instruction = copy.deepcopy(self._triplet_dataset.demonstration.get_instruction())
         self._input_text_prefixes = copy.deepcopy(self._triplet_dataset.demonstration.get_input_text_prefixes())
         self._input_text_affixes = copy.deepcopy(self._triplet_dataset.demonstration.get_input_text_affixes())
@@ -294,6 +295,7 @@ class prompt_writter():
         self._noisy_channel = False
         self._random_for_label_error = stable_random.stable_random()
         self.label_wrong_rate = 0
+        self.cut_by_length = 0
     
     def set_label_wrong_rate(self, label_wrong_rate: float):
         self.label_wrong_rate = label_wrong_rate
@@ -383,6 +385,19 @@ class prompt_writter():
             if type(label) is not str:
                 raise ValueError("Label space should be a list of strings.")
         self._label_space = label_space
+
+    def get_label_space(self):
+        # Return a deep copy of the label space.
+        return copy.deepcopy(self._label_space)
+    
+    def replace_space_to_label(self):
+        # Notice: use this function will reset the label space and the label prefix.
+        self.reset()
+        new_label_space = self.get_label_space()
+        for i in range(len(new_label_space)):
+            new_label_space[i] = ' ' + new_label_space[i]
+        self.change_label_prefix(self._label_prefix[:-1])
+        self.change_label_space(new_label_space)
     
     def write_prompt(self, demos_indexes: list[int], query_index: int):
         # Use the indexes of the demonstrations and the query to write a prompt.
@@ -412,9 +427,9 @@ class prompt_writter():
             if query_index < 0 or query_index >= len(self._triplet_dataset.test):
                 raise ValueError("Index out of range.")
             query_line = self._triplet_dataset.test.get_input_text(query_index)
-        return self.write_prompt_from_dataline(demo_lines, query_line)
+        return self.write_prompt_from_dataline(demo_lines, query_line, self.cut_by_length)
     
-    def write_prompt_from_dataline(self, demos_lines: list[(list[str], str)], query_line: list[str]):
+    def write_prompt_from_dataline(self, demos_lines: list[(list[str], str)], query_line: list[str], cut_by_length = 0):
         """
             You can organize your own data line and use this function to makeup the prompt for inference or calibration.
             For example, in the contextual calibration http://arxiv.org/abs/2102.09690, you can use the following parameters to makeup the prompt for calibration:
@@ -444,7 +459,7 @@ class prompt_writter():
                 prompt += self._label_prefix + label + self._label_affix + self._query_prefix
                 for i in range(self._triplet_dataset.test.get_input_element_numbers()):
                     prompt += self._input_text_prefixes[i] + query_line[i] + self._input_text_affixes[i]
-                ret.append(prompt)
+                ret.append(prompt[:len(prompt) - cut_by_length])
             return ret
             
         # DIRECT
@@ -459,7 +474,7 @@ class prompt_writter():
             for i in range(self._triplet_dataset.test.get_input_element_numbers()):
                 prompt += self._input_text_prefixes[i] + query_line[i] + self._input_text_affixes[i]
             prompt += self._label_prefix
-            return prompt
+            return prompt[:len(prompt) - cut_by_length]
     
     def example(self, k = 8):
         if k < 0 or k > len(self._triplet_dataset.demonstration):

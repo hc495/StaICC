@@ -38,6 +38,8 @@ to install this library.
 
 ## Introduction
 
+`StaICC` is a standardized benchmark for in-context classification tasks. It provides a unified interface for in-context classification tasks, including the following components:
+
 ### Sub-benchmarks
 
 `StaICC` provides several sub-benchmarks for in-context classification evaluations. The following table shows the sub-benchmarks we provide:
@@ -84,7 +86,7 @@ A standard process of the usage of StaICC is shown as below.
 
 ### 1. Write your ICL inference
 
-You should write a function or partial function with a prototype `my_function(prompt, label_space)`. Make sure the name of the formal parameter is consistent with the above. __Typically__, the parameter `prompt` is fed with a `str` variable with a ICL-formatted string, and the `label_space` is fed with a `list[str]` to describe which token in the vocabulary should the model focus as the label.
+You should write a function or partial function with a prototype `my_function(prompt: str, label_space: list[str]) -> Union[list[float], int]`. Make sure the name of the formal parameter is consistent with the above. __Typically__, the parameter `prompt` is fed with a `str` variable with a ICL-formatted string, and the `label_space` is fed with a `list[str]` to describe which token in the vocabulary should the model focus as the label. The return value should be a `list[float]` or `int` to describe the prediction probability or prediction label, aligned with the `label_space`.
 
 You can refer to the functions in `prefabricate_inference/model_kernel.py` as examples. Also, as a quick start, you can reload these functions by `functools.partial` as shown below. (if you import `StaICC.prefabricate_inference.model_kernel`, make sure you have dependencies of `torch` and `transformers >= 4.43`)
 
@@ -151,6 +153,8 @@ When you access the `experimentor`, you can control the experiment. We support t
 
 ### Demonstration Sampling
 
+The demonstration sampling is controled by `experimentor.demonstration_sampler`, which is a `list[list[int]]` shaped object. Each element in the `experimentor.demonstration_sampler` is a list of indices of the demonstrations sequence assigned for the corresponding test sample.
+
 #### Various Demonstration Numbers
 
 You are recommended to define the demonstration number in the initialization of the sub-benchmark. The default value is 4, and you can set the `k` parameter in the instantiation of the sub-benchmark.
@@ -170,11 +174,69 @@ Also, you can set the expected demonstration number after the initialization by 
 
 You can use `experimentor.set_demonstration_sampler(sampler)` function to manually sample the demonstrations for each test sample. You can input any list-styled object `sampler` with the same length as the test samples, and each element in your `sampler` should be a list of indices of the demonstrations you want to use for the corresponding test sample, in sequence.
 
-In this processing, you are likely to need access to these demonstration and test sets. You can access them by `experimentor.demonstration_set` and `experimentor.test_set`. An example is shown [below](prompt_sample).
+In this processing, you are likely to need access to these demonstration and test sets. You can access them by `experimentor.demonstration_set()` and `experimentor.test_set()`. An example is shown [below](prompt_sample).
 
+
+- You must align the `len(sampler)` with the length of the test set `len(experimentor.test_set())`.
 - Notice that setting a `sampler` will set the repeat experiment times from 2 to 1.
-
 - To reset the `sampler` to default, you can call `experimentor.reset_demonstration_sampler()`.
+
+### Prompt Template Editing
+
+The ICL prompt assembly is controlled by `experimentor.prompt_former`. `prompt_former` has the following members to control the prompt template:
+
+- `prompt_former._instruction`: the instruction at the beginning of the prompt. Type: `str`. Can be adjusted by `prompt_former.change_instruction(new_instruction: str)`.
+- `prompt_former._input_text_prefixes`: the prefixes of the input text. Type: `list[str]`, the length should be the same as the number of the input text (for example, 1 for the SST-2, and 2 for the RTE). Can be adjusted by `prompt_former.change_input_text_prefixes(new_prefixes: list[str])`.
+- `prompt_former._input_text_affixes`: the affixes of the input text. Type: `list[str]`, the length should be the same as the number of the input text (for example, 1 for the SST-2, and 2 for the RTE). Can be adjusted by `prompt_former.change_input_text_affixes(new_affixes: list[str])`.
+- `prompt_former._label_prefix`: the prefix of the label. Type: `str`. Can be adjusted by `prompt_former.change_label_prefix(new_prefix: str)`.
+- `prompt_former._label_affix`: the affix of the label. Type: `str`. Can be adjusted by `prompt_former.change_label_affix(new_affix: str)`.
+- `prompt_former._query_prefix`: the prefix of the query. Type: `str`. Notice: after the query_prefix, we still add `_input_text_affixes[0]`. Can be adjusted by `prompt_former.change_query_prefix(new_prefix: str)`.
+- `prompt_former._label_space`: the label space of the dataset. Type: `list[str]`. Can be adjusted by `prompt_former.change_label_space(new_label_space: list[str])`. Notice: this change of label space also reflects to the input to the inference function.
+
+And the prompt will be generated like:
+```
+(notice that all the '\n', '[ ]' and ' ' here are not default, you should add it if you want to split the instruction and the following input texts)
+
+<prompt_former.instruction> 
+[
+  <prompt_former.input_text_prefixes[0]> 
+  <prompt_former.triplet_dataset.demonstration.get_input_text(index)
+  <prompt_former.input_text_prefixes[0]>
+
+  <prompt_former.input_text_prefixes[1]> 
+  <prompt_former.triplet_dataset.demonstration.get_input_text(index)
+  <prompt_former.input_text_prefixes[1]>
+  ...
+  <prompt_former.label_prefix> 
+  <prompt_former.label(index)> 
+  <prompt_former.label_afffix>
+] * k (k = demostration numbers)
+<prompt_former.query_prefix>
+[
+  <prompt_former.input_text_prefixes[0]> 
+  <prompt_former.triplet_dataset.test.get_input_text(index)>
+  <prompt_former.input_text_prefixes[0]>
+
+  <prompt_former.input_text_prefixes[1]> 
+  <prompt_former.triplet_dataset.test.get_input_text(index)>
+  <prompt_former.input_text_prefixes[1]>
+  ...
+  <prompt_former.label_prefix> [MASKED]
+]
+```
+
+- You can call `prompt_former.example()` to observe an example of the prompt.
+- These templates are defaultly defined in the `hgf_dataset_loader.py`. Call `prompt_former.reset()` to reset the prompt template to default.
+
+### Custom inference Function
+
+You can use a custom inference function for each dataset. You can set the inference function by `experimentor.auto_run(forward_inference = my_inference)` where the `forward_inference` should be a function with the prototype `forward_inference(prompt: str, label_space: list[str]) -> Union[list[float], int]`; or `<sub-benchmark>.auto_run(list_of_forward_inference = my_inferences)`, where the `list_of_forward_inference` should be a list of functions with the prototype `forward_inference(prompt: str, label_space: list[str]) -> Union[list[float], int]`, with index aligned with the dataset index.
+
+#### Batched Inference
+
+#### Calibration
+
+#### Preentered Prediction
 
 ## Examples
 
@@ -184,7 +246,63 @@ In this processing, you are likely to need access to these demonstration and tes
 
 <span id="list_inference"></span>
 
-As an example, we repeat the k-NN demonstration experiment proposed by paper [What Makes Good In-Context Examples for GPT-3?](https://arxiv.org/abs/2101.06804). 
+As an example, we repeat the k-NN demonstration experiment proposed by paper [What Makes Good In-Context Examples for GPT-3?](https://arxiv.org/abs/2101.06804). The full code are shown in file `prefabricate_inference/prompt_template_edit.py`, and the key part about the manual demonstration is shown below:
+
+```python
+class SA_ICL():
+...
+    def _encode_demonstrations(self):
+        count = 0
+        for demo in self.experimentor.demonstration_set():
+            if len(demo[0]) == 0:
+                continue
+            try:
+                count += 1
+                self.TopK_anchors.append(
+                    model_kernel.standard_ICL_inference_with_torch_Causal_LM(
+                        prompt = demo[0], 
+                        model = self.model, 
+                        tokenizer = self.tokenizer, 
+                        label_space = self.label_space, 
+                        cache_empty = self.cache_empty,
+                        calibration_function = None,
+                        return_hidden_state = True
+                    )[-1] # Get the last hidden state as the encoding vector.
+                )
+            except:
+                continue
+        self.TopK_anchors = np.array(self.TopK_anchors)
+
+    def _get_top_k_indexes(self, test_sample, k):
+        self._encode_demonstrations()
+        distance = []
+        test_sample_encoded = model_kernel.standard_ICL_inference_with_torch_Causal_LM(
+            prompt = test_sample, 
+            model = self.model, 
+            tokenizer = self.tokenizer, 
+            label_space = self.label_space, 
+            cache_empty = self.cache_empty,
+            calibration_function = None,
+            return_hidden_state = True
+        )[-1] # Get the last hidden state as the encoding vector.
+
+        # Calculate the distance between the test sample and each anchor (encoded demonstration samples by _encode_demonstrations).
+        for anchor in self.TopK_anchors:
+            distance.append(np.linalg.norm(test_sample_encoded - np.array(anchor)))
+        ret = []
+        for _ in range(k):
+            ret.append(functional.argmin(distance))
+            distance[functional.argmin(distance)] = 1e10
+        return ret
+
+    def set_TopK_to_demonstration(self, k):
+        demonstration_sampler = []
+        for i in range(len(self.experimentor.test_set())):
+            demonstration_sampler.append(self._get_top_k_indexes(self.experimentor.test_set()[i][0], k))
+        self.experimentor.set_demonstration_sampler(demonstration_sampler)
+```
+
+
 
 ### Use different inference function for each dataset
 
@@ -192,13 +310,53 @@ As an example, we repeat the k-NN demonstration experiment proposed by paper [Wh
 
 
 
-## Benchmark Results
-
-You are welcome to use issue to report your own results. 
-
-See 'issue' for further information.
-
 ## Detailed Documentation
 
-## Citation
+### `demonstration_sampler` class
 
+### `prompt_former` class
+
+### `single_experimentor` class
+
+As the basic module of StaICC, the `single_experimentor` class is a class to control the experiment process of a single dataset. You should be care about the following functions:
+
+#### `set_k(k: int)`
+
+Set the expected demonstration number for each test sample. The parameter `k` is the expected demonstration number.
+
+#### `get_k() -> int`
+
+Get the expected demonstration number `k`.
+
+#### `get_repeat_times() -> int`
+
+Get the repeat times for each test samples. Default is 2.
+
+#### `set_out_of_domain_mode() -> None`
+
+Resample the demonstrations for each test sample to make sure the ground-truth label of the test sample is not in the demonstrations. 
+
+#### `set_in_domain_mode() -> None`
+
+Resample the demonstrations for each test sample to make sure the ground-truth label of the test sample is in the demonstrations.
+
+#### `set_demonstration_sampler(sampler: list[list[int]]) -> None`
+
+Set the demonstration sampler for each test sample. The parameter `sampler` is a `list[list[int]]` object. Each element in the `sampler` is a list of indices of the demonstrations sequence assigned for the corresponding test sample.
+
+#### `reset_demonstration_sampler() -> None`
+
+Reset the demonstration sampler to default.
+
+Will cancel the `set_out_of_domain_mode()`, `set_in_domain_mode()`, and `set_demonstration_sampler(sampler)`.
+
+#### `demonstration_set() -> list[list[str]]`
+
+#### `auto_run(forward_inference, preentered_prediction, batched_inference, return_outputs)`
+
+Run the experiment with the given inference function. Also override the `__call__` method. The parameters are:
+
+**You should provide either `forward_inference` or `preentered_prediction`.**
+
+- `forward_inference`: The inference function to be used in the experiment. Basically (without `batched_inference`), the prototype of the inference function should be `forward_inference(prompt, label_space)`. An example is shown in [Quick Start](#quick-start).
+- `preentered_prediction`: If you already have all the inference results (`list[list[float]]` or `list[int]`) aligned with the `experimentor.prompt_set()`, you can directly input them by the `preentered_prediction`. A `list[list[float]]` object to store the pre-entered prediction of the model. The shape of the object should be `(len(experimentor.prompt_set()), len(get_label_space()))`.

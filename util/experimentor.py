@@ -193,7 +193,7 @@ class single_experimentor():
         return self.prompt_former.write_prompt_from_dataline
 
     def get_label_space(self):
-        return self.triplet_dataset.get_label_space()
+        return copy.deepcopy(self.prompt_former.get_label_space())
     
     def set_demonstration_sampler(self, sampler):
         # The sampler can be a list-shaped list of integers. 
@@ -248,7 +248,7 @@ class single_experimentor():
                 for time in range(self._repeat_times):
                     for index in range(len(self.triplet_dataset.test)):
                         prompt = self._get_prompts_for_test_sample(index, time)
-                        result = forward_inference(prompt = prompt, label_space = self.triplet_dataset.get_label_space()) # The inputted parameter signs are fixed to prompt and label_space.
+                        result = forward_inference(prompt = prompt, label_space = self.prompt_former.get_label_space()) # The inputted parameter signs are fixed to prompt and label_space.
                         ground_truth.append(self.triplet_dataset.get_default_ground_truth_label_from_index(index))
                         self.label_dis[ground_truth[-1]] += 1
                         prediction.append(result)
@@ -266,7 +266,7 @@ class single_experimentor():
                         prompts.append(self._get_prompts_for_test_sample(index, time))
                         ground_truth.append(self.triplet_dataset.get_default_ground_truth_label_from_index(index))
                         self.label_dis[ground_truth[-1]] += 1
-                prediction = forward_inference(prompt = prompts, label_space = self.triplet_dataset.get_label_space())
+                prediction = forward_inference(prompt = prompts, label_space = self.prompt_former.get_label_space())
         elif preentered_prediction is not None:
             for time in range(self._repeat_times):
                 for index in range(len(self.triplet_dataset.test)):
