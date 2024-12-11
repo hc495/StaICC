@@ -22,19 +22,21 @@ You can only download a release pack of StaICC and unfold it into your work path
 ```
 --- work_path
  |--- StaICC
- | |- __init__.py
- | |- ...
+ | |-- __init__.py
+ | |-- ...
  |--- experiment_code.py
  |--- ...
 ```
 
-Also, we release PyPl package `StaICC`. You can use:
+We will provide a PyPl package `StaICC` in the future.
+
+<!-- Also, we release PyPl package `StaICC`. You can use:
 
 ```
 pip install StaICC
 ```
 
-to install this library.
+to install this library. -->
 
 ## Introduction
 
@@ -48,6 +50,7 @@ to install this library.
 |:---:|:---:|:---:|
 | StaICC-Normal | `from StaICC import Normal` | A standard classification accuracy-based benchmark for normal classification tasks. |
 | StaICC-Diagnosis: Bias | `from StaICC import Triplet_bias` | A prediction logits bias (3 types) detector. |
+| StaICC-Diagnosis: Noise Sensitivity | `from StaICC import GLER` | A noise sensitivity detector. |
 
 #### StaICC-Normal
 
@@ -61,7 +64,13 @@ to install this library.
 
 2. **Domainal Bias**: Introduced by [Mitigating Label Biases for In-context Learning](http://arxiv.org/abs/2305.19148), domainal bias measures the bias when some demonstrations and a query of randomly sampled tokens from the test dataset is fed into the model. We use the entropy of the averaged prediction probabilites as the metric.
 
-3. **Posterior Bias**: 
+3. **Posterior Bias**: Measures the bias from the predicted probability to the frequency of the ground-truth label.
+
+You can use them dividedly by `from StaICC import Contextual_bias, Domain_bias, Post_bias`.
+
+#### StaICC-Diagnosis: Noise Sensitivity
+
+`StaICC-Diagnosis: Noise Sensitivity` is a noise sensitivity detector. It uses the Generalized Label Error Rate (GLER) as the metric. The GLER is defined in [Ground-Truth Labels Matter: A Deeper Look into Input-Label Demonstrations](http://arxiv.org/abs/2205.12685), which is the slope of the curve of the prediction probability against the label correctness in the demonstration. Larger GLER indicates higher noise sensitivity.
 
 ### Datasets
 
@@ -86,7 +95,7 @@ A standard process of the usage of StaICC is shown as below.
 
 ### 1. Write your ICL inference
 
-You should write a function or partial function with a prototype `my_function(prompt: str, label_space: list[str]) -> Union[list[float], int]`. Make sure the name of the formal parameter is consistent with the above. __Typically__, the parameter `prompt` is fed with a `str` variable with a ICL-formatted string, and the `label_space` is fed with a `list[str]` to describe which token in the vocabulary should the model focus as the label. The return value should be a `list[float]` or `int` to describe the prediction probability or prediction label, aligned with the `label_space`.
+You should write a function or partial function with a prototype `my_function(prompt: str, label_space: list[str]) -> Union[list[float], int]`. Make sure the name of the formal parameter is consistent with the above. __Typically__, the parameter `prompt` is fed with a `str` variable with a ICL-formatted string, and the `label_space` is fed with a `list[str]` to describe which token in the vocabulary should the model focus as the label. The return value should be a `list[float]` or `int` to describe the prediction probability / logits (if you pass a logits, we will calculate softmax) or prediction label, aligned with the `label_space`.
 
 You can refer to the functions in `prefabricate_inference/model_kernel.py` as examples. Also, as a quick start, you can reload these functions by `functools.partial` as shown below. (if you import `StaICC.prefabricate_inference.model_kernel`, make sure you have dependencies of `torch` and `transformers >= 4.43`)
 
@@ -120,7 +129,7 @@ benchmark = Normal()
 ### 3. Test your inference function
 
 ```python
-result_dictionary = benchmark(inference)
+result_dictionary = benchmark(my_inference)
 ```
 
 A typical output is a dictionary as:
@@ -174,7 +183,7 @@ Also, you can set the expected demonstration number after the initialization by 
 
 You can use `experimentor.set_demonstration_sampler(sampler)` function to manually sample the demonstrations for each test sample. You can input any list-styled object `sampler` with the same length as the test samples, and each element in your `sampler` should be a list of indices of the demonstrations you want to use for the corresponding test sample, in sequence.
 
-In this processing, you are likely to need access to these demonstration and test sets. You can access them by `experimentor.demonstration_set()` and `experimentor.test_set()`. An example is shown [below](prompt_sample).
+In this processing, you are likely to need access to these demonstration and test sets. You can access them by `experimentor.demonstration_set()` and `experimentor.test_set()`. An example is shown [below](#prompt_sample).
 
 
 - You must align the `len(sampler)` with the length of the test set `len(experimentor.test_set())`.
@@ -195,7 +204,7 @@ The ICL prompt assembly is controlled by `experimentor.prompt_former`. `prompt_f
 
 And the prompt will be generated like:
 ```
-(notice that all the '\n', '[ ]' and ' ' here are not default, you should add it if you want to split the instruction and the following input texts)
+(notice that all the '\n', '[ ]' and ' ' shown as the format here are not default, you should add it if you want to split the instruction)
 
 <prompt_former.instruction> 
 [
@@ -228,23 +237,30 @@ And the prompt will be generated like:
 - You can call `prompt_former.example()` to observe an example of the prompt.
 - These templates are defaultly defined in the `hgf_dataset_loader.py`. Call `prompt_former.reset()` to reset the prompt template to default.
 
-### Custom inference Function
+### Custom Inference
 
-You can use a custom inference function for each dataset. You can set the inference function by `experimentor.auto_run(forward_inference = my_inference)` where the `forward_inference` should be a function with the prototype `forward_inference(prompt: str, label_space: list[str]) -> Union[list[float], int]`; or `<sub-benchmark>.auto_run(list_of_forward_inference = my_inferences)`, where the `list_of_forward_inference` should be a list of functions with the prototype `forward_inference(prompt: str, label_space: list[str]) -> Union[list[float], int]`, with index aligned with the dataset index.
+You can use a custom inference function for each dataset, which can be set by the inference function `experimentor.auto_run(forward_inference = my_inference)` where the `forward_inference` should be a function with the prototype `forward_inference(prompt: str, label_space: list[str]) -> Union[list[float], int]`; or `<sub-benchmark>.auto_run(list_of_forward_inference = my_inferences)`, where the `list_of_forward_inference` should be a list of functions with the prototype `forward_inference(prompt: str, label_space: list[str]) -> Union[list[float], int]`, with index aligned with the dataset index.
+
+If you wish to perform any **preprocessing** on the inference function, such as learning a calibration, you should complete this process in advance (note: we have prepared some additional data for such preprocessing in `experimentor.calibration_set()`, it is a standard [`basic_datasets_loader` object](#dataset_loader)) while maintaining the function interface as described above. There are only two exceptions: (descirbed below) 1. You intend to use a batched inference process, providing an input list and requesting an output list. 2. You wish to directly evaluate existing prediction values.
 
 #### Batched Inference
 
-#### Calibration
+If you want to use a batched inference process, you can set `batched_inference=True` in the `auto_run` function. The prototype of the batched inference function should be `batched_inference(prompts: list[str], label_space: list[str]) -> list[list[float]]` or `batched_inference(prompts: list[str], label_space: list[str]) -> list[int]`. An example with [Batch Calibration](https://arxiv.org/abs/2309.17249) is shown in `examples/batched_inference.ipynb`.
 
 #### Preentered Prediction
 
+#### Calibration
+
+#### Noisy Channel Inference
+
+Example shown in `examples/noisy_channel.ipynb`.
+
 ## Examples
 
+More examples are shown in the `examples` folder.
+
 <span id="prompt_sample"></span>
-
-### Use manual demonstration sequence in your experiment
-
-<span id="list_inference"></span>
+### Example 1: Use manual demonstration sequence in your experiment
 
 As an example, we repeat the k-NN demonstration experiment proposed by paper [What Makes Good In-Context Examples for GPT-3?](https://arxiv.org/abs/2101.06804). The full code are shown in file `prefabricate_inference/prompt_template_edit.py`, and the key part about the manual demonstration is shown below:
 
@@ -304,7 +320,7 @@ class SA_ICL():
 
 
 
-### Use different inference function for each dataset
+### Example 2: Use different inference function for each dataset
 
 
 
@@ -312,13 +328,28 @@ class SA_ICL():
 
 ## Detailed Documentation
 
+<span id="dataset_loader"></span>
+### `basic_datasets_loader` class
+
+The `basic_datasets_loader` class is a class to load the dataset and define the inference behavior on these dataset. Generally, you should not access this class directly. It is recommended to access it through the `*_set()` functions of `single_experimentor`.
+
+**Notice: if you access this class from `*_set()` functions of `single_experimentor`, you should be only care about the following functions:**
+
+#### `__getitem__(index: int) -> Tuple[list[str], int]`
+
+Get the input texts (notice that for multi-input task, the input texts can be multiple, so we use `list[str]`) and the label of one data indexed by parameter `index`. The return value is a tuple of the input texts and the label index.
+
+#### `label_index_to_text(index: int) -> str`
+
+Transfer label index to label text.
+
 ### `demonstration_sampler` class
 
 ### `prompt_former` class
 
 ### `single_experimentor` class
 
-As the basic module of StaICC, the `single_experimentor` class is a class to control the experiment process of a single dataset. You should be care about the following functions:
+As the basic module of StaICC, the `single_experimentor` class is a class to control the experiment process of a single dataset. 
 
 #### `set_k(k: int)`
 
@@ -350,13 +381,39 @@ Reset the demonstration sampler to default.
 
 Will cancel the `set_out_of_domain_mode()`, `set_in_domain_mode()`, and `set_demonstration_sampler(sampler)`.
 
-#### `demonstration_set() -> list[list[str]]`
+#### `demonstration_set() -> basic_datasets_loader`
 
-#### `auto_run(forward_inference, preentered_prediction, batched_inference, return_outputs)`
+Return the demonstration set of the dataset as a `basic_datasets_loader` object.
+
+#### `test_set() -> basic_datasets_loader`
+
+Return the test set of the dataset as a `basic_datasets_loader` object.
+
+#### `calibration_set() -> basic_datasets_loader`
+
+Return the calibration set of the dataset as a `basic_datasets_loader` object.
+
+#### `prompt_set() -> list[str]`
+
+Return the full prompt set to be input to the inference function.
+
+#### `auto_run(forward_inference = None, preentered_prediction = None, batched_inference = False, return_outputs = False) -> dict`
 
 Run the experiment with the given inference function. Also override the `__call__` method. The parameters are:
 
 **You should provide either `forward_inference` or `preentered_prediction`.**
 
-- `forward_inference`: The inference function to be used in the experiment. Basically (without `batched_inference`), the prototype of the inference function should be `forward_inference(prompt, label_space)`. An example is shown in [Quick Start](#quick-start).
-- `preentered_prediction`: If you already have all the inference results (`list[list[float]]` or `list[int]`) aligned with the `experimentor.prompt_set()`, you can directly input them by the `preentered_prediction`. A `list[list[float]]` object to store the pre-entered prediction of the model. The shape of the object should be `(len(experimentor.prompt_set()), len(get_label_space()))`.
+- `forward_inference`: The inference function to be used in the experiment. Basically (without `batched_inference`), the prototype of the inference function should be `forward_inference(prompt, label_space) -> Union[list[float], int]`. An example is shown in [Quick Start](#quick-start).
+- `preentered_prediction`: If you already have all the inference results (`list[list[float]]` or `list[int]`) aligned with the `experimentor.prompt_set()`, you can directly input them by the `preentered_prediction`, a `list[list[float]]` object to store the pre-entered prediction of the model. The shape should be `(len(experimentor.prompt_set()), len(get_label_space()))`.
+- `batched_inference`: If you want to use a batched inference process, you can set `batched_inference=True`. The prototype of the batched inference function should be `batched_inference(prompts: list[str], label_space: list[str]) -> list[list[float]]` or `batched_inference(prompts: list[str], label_space: list[str]) -> list[int]`.
+- `return_outputs`: If you want to return the direct outputs of the inference function, you can set `return_outputs=True`. The outputs will be stored in the `outputs` field of the return dictionary.
+
+The return value is a 2- or 3-turple, as: `(result_dictionary, success_indicator, direct_outputs)`.
+- `result_dictionary`: The dictionary of the metric results.
+    Defaultly, we provide the following metrics:
+    - `accuracy`: The accuracy of the prediction.
+    - `averaged_truelabel_likelihood`: The averaged likelihood of the ground-truth label. Only effective when the predicted probability is returned as the prediction.
+    - `macro_F1`: The macro F1 score of the prediction.
+    - `expected_calibration_error_1`: The expected calibration error of the prediction. Only effective when the predicted probability is returned as the prediction.
+- `success_indicator`: A boolean value to indicate whether the experiment is successful. If the experiment is successful, the value is `True`, otherwise, the value is `False`.
+- `direct_outputs`: The direct outputs of the inference function. Only returned when `return_outputs=True`. Formatted as a dictionary with keys: `ground_truth, predictions, predicted_probabilities`.

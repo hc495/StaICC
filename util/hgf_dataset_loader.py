@@ -244,7 +244,10 @@ class basic_datasets_loader():
 
     def get_label(self, index: int) -> str:
         # Should return a string. Should call the _label_mapping.
-        return self._label_space[self._label_mapping[self.table[index][1]]]
+        return self.label_index_to_text(self.table[index][1])
+    
+    def label_index_to_text(self, label_index: int) -> str:
+        return self._label_space[self._label_mapping[label_index]]
     
     def find_index_from_label(self, label: str) -> int:
         # Should return the index of the label in the label space.
