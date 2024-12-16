@@ -2,6 +2,18 @@ import math
 import warnings
 from . import configs
 
+def probability_matrix_check(x):
+    if not all([probability_vector_check(x_i) for x_i in x]):
+        return False
+    return True
+
+def probability_vector_check(x):
+    if not all([0 <= x_i <= 1 for x_i in x]):
+        return False
+    if sum(x) != 1:
+        return False
+    return True
+
 def exp_to_list(list):
     return [math.exp(x) for x in list]
 
@@ -64,7 +76,8 @@ def softmax(x):
     return [x_i / sum_x for x_i in f_x]
 
 def entropy(x): # nats
-    if not all([0 <= x_i <= 1 for x_i in x]):
+    # if not all([0 <= x_i <= 1 for x_i in x]):
+    if not probability_vector_check(x):
         x = softmax(x)
     if type(x[0]) != list:
         return -sum([x_i * math.log(x_i) for x_i in x if x_i != 0])
@@ -101,7 +114,8 @@ def compress_logits_prediction_to_onehot(prediction: list[list[float]]) -> list[
 def accuracy(ground_truth: list[int], prediction):
     if len(ground_truth) != len(prediction):
         raise ValueError("The length of ground_truth and prediction should be the same.")
-    if not all([all([0 <= y <= 1 for y in x]) for x in prediction]):
+    # if not all([all([0 <= y <= 1 for y in x]) for x in prediction]):
+    if not probability_matrix_check(prediction):
         prediction = [softmax(x) for x in prediction]
     
     correct = 0
@@ -114,7 +128,8 @@ def accuracy(ground_truth: list[int], prediction):
 def averaged_truelabel_likelihood(ground_truth: list[int], prediction):
     if len(ground_truth) != len(prediction):
         raise ValueError("The length of ground_truth and prediction should be the same.")
-    if not all([all([0 <= y <= 1 for y in x]) for x in prediction]):
+    # if not all([all([0 <= y <= 1 for y in x]) for x in prediction]):
+    if not probability_matrix_check(prediction):
         prediction = [softmax(x) for x in prediction]
     
     likelihood = 0
@@ -126,7 +141,8 @@ def averaged_truelabel_likelihood(ground_truth: list[int], prediction):
 def macro_F1(ground_truth: list[int], prediction):
     if len(ground_truth) != len(prediction):
         raise ValueError("The length of ground_truth and prediction should be the same.")
-    if not all([all([0 <= y <= 1 for y in x]) for x in prediction]):
+    # if not all([all([0 <= y <= 1 for y in x]) for x in prediction]):
+    if not probability_matrix_check(prediction):
         prediction = [softmax(x) for x in prediction]
     
     TP = [0] * len(prediction[0])
@@ -148,7 +164,7 @@ def macro_F1(ground_truth: list[int], prediction):
 def expected_calibration_error_1(ground_truth: list[int], prediction, bins = configs.STANDARD_SETTINGS["ece_bins"]):
     if len(ground_truth) != len(prediction):
         raise ValueError("The length of ground_truth and prediction should be the same.")
-    if not all([all([0 <= y <= 1 for y in x]) for x in prediction]):
+    if not probability_matrix_check(prediction):
         prediction = [softmax(x) for x in prediction]
     if bins <= 1:
         raise ValueError("bins should be greater than 1.")
@@ -175,3 +191,23 @@ def expected_calibration_error_1(ground_truth: list[int], prediction, bins = con
         accuracy_in_bin = [1 if label == ground_truth[i] else 0 for i, label in enumerate(predicted_label) if bin_lower <= confidences[i] < bin_upper]
         ece += len(in_bin) / len(ground_truth) * abs(sum(accuracy_in_bin) / len(accuracy_in_bin) - sum(in_bin) / len(in_bin))
     return ece
+
+
+def single_consistency(prediction: list[int]):
+    majority = max(set(prediction), key=prediction.count)
+    return prediction.count(majority) / len(prediction)
+
+
+def consistency(ground_truth, prediction, loop_length = 100):
+    if not probability_matrix_check(prediction):
+        prediction = [softmax(x) for x in prediction]
+    if len(prediction) % loop_length != 0:
+        raise ValueError("The length of prediction should be the multiple of loop_length.")
+    
+    sum = 0
+    for i in range(loop_length):
+        single_prediction = []
+        for j in range(i, len(prediction), loop_length):
+            single_prediction.append(argmax(prediction[j]))
+        sum += single_consistency(single_prediction)
+    return sum / loop_length

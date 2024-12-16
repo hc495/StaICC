@@ -1,6 +1,6 @@
-# StaICC: Standardized Benchmark for In-context Classification
+# StaICC: Standardized Toolkit for In-context Classification
 
-This is a standard implementation of paper "StaICC: Standardized Benchmark for In-context Classification" by Hakaze Cho.
+This is a standardized toolkit for in-context classification by Hakaze Cho (Yufeng Zhao).
 
 ## Content
 
@@ -8,10 +8,8 @@ This is a standard implementation of paper "StaICC: Standardized Benchmark for I
 2. [Introduction](#introduction)
 3. [Quick Start](#quick-start)
 4. [Custom Experiment](#custom-experiment)
-5. [Examples](#examples)
-6. [Benchmark Results](#benchmark-results)
-7. [Citation](#citation)
-8. [Detailed Documentation](#detailed-documentation)
+5. [Sub-benchmarks](#sub-benchmarks)
+6. [Detailed Documentation](#detailed-documentation)
 
 ## Installation
 
@@ -44,13 +42,14 @@ to install this library. -->
 
 ### Sub-benchmarks
 
-`StaICC` provides several sub-benchmarks for in-context classification evaluations. The following table shows the sub-benchmarks we provide:
+`StaICC` provides several sub-benchmarks for in-context classification evaluations. Please refer to the [Sub-benchmarks](#sub-benchmarks) section for details of usage. The following table lists the sub-benchmarks we provide:
 
 | Name | Import name | Describe |
 |:---:|:---:|:---:|
 | StaICC-Normal | `from StaICC import Normal` | A standard classification accuracy-based benchmark for normal classification tasks. |
 | StaICC-Diagnosis: Bias | `from StaICC import Triplet_bias` | A prediction logits bias (3 types) detector. |
-| StaICC-Diagnosis: Noise Sensitivity | `from StaICC import GLER` | A noise sensitivity detector. |
+| StaICC-Diagnosis: Noise Sensitivity | `from StaICC import GLER` | A demonstration label noise sensitivity detector. |
+| StaICC-Diagnosis: Template Sensitivity | `from StaICC import Template_sens` | A template sensitivity detector against 9 prompt templates. |
 
 #### StaICC-Normal
 
@@ -70,7 +69,11 @@ You can use them dividedly by `from StaICC import Contextual_bias, Domain_bias, 
 
 #### StaICC-Diagnosis: Noise Sensitivity
 
-`StaICC-Diagnosis: Noise Sensitivity` is a noise sensitivity detector. It uses the Generalized Label Error Rate (GLER) as the metric. The GLER is defined in [Ground-Truth Labels Matter: A Deeper Look into Input-Label Demonstrations](http://arxiv.org/abs/2205.12685), which is the slope of the curve of the prediction probability against the label correctness in the demonstration. Larger GLER indicates higher noise sensitivity.
+`StaICC-Diagnosis: Noise Sensitivity` is a noise sensitivity detector of the correlation of accuracy against demonstration label noise. It uses the Generalized Label Error Rate (GLER) as the metric. The GLER is defined in [Ground-Truth Labels Matter: A Deeper Look into Input-Label Demonstrations](http://arxiv.org/abs/2205.12685), which is the slope of the curve of the prediction probability against the label correctness in the demonstration. Larger GLER indicates higher noise sensitivity.
+
+#### StaICC-Diagnosis: Template Sensitivity
+
+`StaICC-Diagnosis: Template Sensitivity` is a template sensitivity detector against 9 prompt templates. It uses the prediction consistency as a negative metric to the sensitivity: for one set of demonstraions and query, we make up 9 prompts with different templates, and calculate the prediction consistency of the model. Lower prediction consistency indicates higher template sensitivity.
 
 ### Datasets
 
@@ -87,7 +90,7 @@ In StaICC, we use the following original datasets:
 |6|Subjective | Subjectivity Classification | objective, subjective|https://dl.acm.org/doi/10.5555/2390665.2390688|
 |7|Tweet Eval Emotion | Sentiment Classification | anger, joy, optimism, sadness|https://aclanthology.org/S18-1001/|
 |8|Tweet Eval Hate |Hate Speech Classification | non-hate, hate|https://aclanthology.org/S19-2007/|
-|9|Hate Speech 18	|Hate Speech Classification| noHate, hate, idk/skip, relation| - |
+|9|Hate Speech 18|Hate Speech Classification| noHate, hate, idk/skip, relation| - |
 
 ## Quick Start
 
@@ -183,86 +186,15 @@ Also, you can set the expected demonstration number after the initialization by 
 
 You can use `experimentor.set_demonstration_sampler(sampler)` function to manually sample the demonstrations for each test sample. You can input any list-styled object `sampler` with the same length as the test samples, and each element in your `sampler` should be a list of indices of the demonstrations you want to use for the corresponding test sample, in sequence.
 
-In this processing, you are likely to need access to these demonstration and test sets. You can access them by `experimentor.demonstration_set()` and `experimentor.test_set()`. An example is shown [below](#prompt_sample).
+In this processing, you are likely to need access to these demonstration and test sets. You can access them by `experimentor.demonstration_set()` and `experimentor.test_set()`. 
 
+**Tips**
 
 - You must align the `len(sampler)` with the length of the test set `len(experimentor.test_set())`.
 - Notice that setting a `sampler` will set the repeat experiment times from 2 to 1.
 - To reset the `sampler` to default, you can call `experimentor.reset_demonstration_sampler()`.
 
-### Prompt Template Editing
-
-The ICL prompt assembly is controlled by `experimentor.prompt_former`. `prompt_former` has the following members to control the prompt template:
-
-- `prompt_former._instruction`: the instruction at the beginning of the prompt. Type: `str`. Can be adjusted by `prompt_former.change_instruction(new_instruction: str)`.
-- `prompt_former._input_text_prefixes`: the prefixes of the input text. Type: `list[str]`, the length should be the same as the number of the input text (for example, 1 for the SST-2, and 2 for the RTE). Can be adjusted by `prompt_former.change_input_text_prefixes(new_prefixes: list[str])`.
-- `prompt_former._input_text_affixes`: the affixes of the input text. Type: `list[str]`, the length should be the same as the number of the input text (for example, 1 for the SST-2, and 2 for the RTE). Can be adjusted by `prompt_former.change_input_text_affixes(new_affixes: list[str])`.
-- `prompt_former._label_prefix`: the prefix of the label. Type: `str`. Can be adjusted by `prompt_former.change_label_prefix(new_prefix: str)`.
-- `prompt_former._label_affix`: the affix of the label. Type: `str`. Can be adjusted by `prompt_former.change_label_affix(new_affix: str)`.
-- `prompt_former._query_prefix`: the prefix of the query. Type: `str`. Notice: after the query_prefix, we still add `_input_text_affixes[0]`. Can be adjusted by `prompt_former.change_query_prefix(new_prefix: str)`.
-- `prompt_former._label_space`: the label space of the dataset. Type: `list[str]`. Can be adjusted by `prompt_former.change_label_space(new_label_space: list[str])`. Notice: this change of label space also reflects to the input to the inference function.
-
-And the prompt will be generated like:
-```
-(notice that all the '\n', '[ ]' and ' ' shown as the format here are not default, you should add it if you want to split the instruction)
-
-<prompt_former.instruction> 
-[
-  <prompt_former.input_text_prefixes[0]> 
-  <prompt_former.triplet_dataset.demonstration.get_input_text(index)
-  <prompt_former.input_text_prefixes[0]>
-
-  <prompt_former.input_text_prefixes[1]> 
-  <prompt_former.triplet_dataset.demonstration.get_input_text(index)
-  <prompt_former.input_text_prefixes[1]>
-  ...
-  <prompt_former.label_prefix> 
-  <prompt_former.label(index)> 
-  <prompt_former.label_afffix>
-] * k (k = demostration numbers)
-<prompt_former.query_prefix>
-[
-  <prompt_former.input_text_prefixes[0]> 
-  <prompt_former.triplet_dataset.test.get_input_text(index)>
-  <prompt_former.input_text_prefixes[0]>
-
-  <prompt_former.input_text_prefixes[1]> 
-  <prompt_former.triplet_dataset.test.get_input_text(index)>
-  <prompt_former.input_text_prefixes[1]>
-  ...
-  <prompt_former.label_prefix> [MASKED]
-]
-```
-
-- You can call `prompt_former.example()` to observe an example of the prompt.
-- These templates are defaultly defined in the `hgf_dataset_loader.py`. Call `prompt_former.reset()` to reset the prompt template to default.
-
-### Custom Inference
-
-You can use a custom inference function for each dataset, which can be set by the inference function `experimentor.auto_run(forward_inference = my_inference)` where the `forward_inference` should be a function with the prototype `forward_inference(prompt: str, label_space: list[str]) -> Union[list[float], int]`; or `<sub-benchmark>.auto_run(list_of_forward_inference = my_inferences)`, where the `list_of_forward_inference` should be a list of functions with the prototype `forward_inference(prompt: str, label_space: list[str]) -> Union[list[float], int]`, with index aligned with the dataset index.
-
-If you wish to perform any **preprocessing** on the inference function, such as learning a calibration, you should complete this process in advance (note: we have prepared some additional data for such preprocessing in `experimentor.calibration_set()`, it is a standard [`basic_datasets_loader` object](#dataset_loader)) while maintaining the function interface as described above. There are only two exceptions: (descirbed below) 1. You intend to use a batched inference process, providing an input list and requesting an output list. 2. You wish to directly evaluate existing prediction values.
-
-#### Batched Inference
-
-If you want to use a batched inference process, you can set `batched_inference=True` in the `auto_run` function. The prototype of the batched inference function should be `batched_inference(prompts: list[str], label_space: list[str]) -> list[list[float]]` or `batched_inference(prompts: list[str], label_space: list[str]) -> list[int]`. An example with [Batch Calibration](https://arxiv.org/abs/2309.17249) is shown in `examples/batched_inference.ipynb`.
-
-#### Preentered Prediction
-
-#### Calibration
-
-#### Noisy Channel Inference
-
-Example shown in `examples/noisy_channel.ipynb`.
-
-## Examples
-
-More examples are shown in the `examples` folder.
-
-<span id="prompt_sample"></span>
-### Example 1: Use manual demonstration sequence in your experiment
-
-As an example, we repeat the k-NN demonstration experiment proposed by paper [What Makes Good In-Context Examples for GPT-3?](https://arxiv.org/abs/2101.06804). The full code are shown in file `prefabricate_inference/prompt_template_edit.py`, and the key part about the manual demonstration is shown below:
+**An example:** we repeat the k-NN demonstration experiment proposed by paper [What Makes Good In-Context Examples for GPT-3?](https://arxiv.org/abs/2101.06804). The full code are shown in file `prefabricate_inference/prompt_template_edit.py`, and the key part about the manual demonstration is shown below:
 
 ```python
 class SA_ICL():
@@ -315,25 +247,135 @@ class SA_ICL():
         demonstration_sampler = []
         for i in range(len(self.experimentor.test_set())):
             demonstration_sampler.append(self._get_top_k_indexes(self.experimentor.test_set()[i][0], k))
+        # We operate the demonstration sampler by the following line.
         self.experimentor.set_demonstration_sampler(demonstration_sampler)
 ```
 
+### Prompt Template Editing
 
+The ICL prompt assembly is controlled by `experimentor.prompt_former`. `prompt_former` has the following members to control the prompt template:
+
+- `prompt_former._instruction`: the instruction at the beginning of the prompt. Type: `str`. Can be adjusted by `prompt_former.change_instruction(new_instruction: str)`.
+- `prompt_former._input_text_prefixes`: the prefixes of the input text. Type: `list[str]`, the length should be the same as the number of the input text (for example, 1 for the SST-2, and 2 for the RTE). Can be adjusted by `prompt_former.change_input_text_prefixes(new_prefixes: list[str])`.
+- `prompt_former._input_text_affixes`: the affixes of the input text. Type: `list[str]`, the length should be the same as the number of the input text (for example, 1 for the SST-2, and 2 for the RTE). Can be adjusted by `prompt_former.change_input_text_affixes(new_affixes: list[str])`.
+- `prompt_former._label_prefix`: the prefix of the label. Type: `str`. Can be adjusted by `prompt_former.change_label_prefix(new_prefix: str)`.
+- `prompt_former._label_affix`: the affix of the label. Type: `str`. Can be adjusted by `prompt_former.change_label_affix(new_affix: str)`.
+- `prompt_former._query_prefix`: the prefix of the query. Type: `str`. Notice: after the query_prefix, we still add `_input_text_affixes[0]`. Can be adjusted by `prompt_former.change_query_prefix(new_prefix: str)`.
+- `prompt_former._label_space`: the label space of the dataset. Type: `list[str]`. Can be adjusted by `prompt_former.change_label_space(new_label_space: list[str])`. Notice: this change of label space also reflects to the input to the inference function.
+- `prompt_former._label_wrong_rate`: the rate of the wrong label in the demonstrations. Type: `float`. Can be adjusted by `prompt_former.change_label_wrong_rate(new_rate: float)`.
+- `prompt_former._use_noisy_channel`: whether to use the noisy channel inference. Type: `bool`. Can be enabled by `prompt_former.use_noisy_channel()`, and disabled by `prompt_former.disable_noisy_channel()`.
+
+And the prompt will be generated like:
+```
+(notice that all the '\n', '[ ]' and ' ' shown as the format here are not default, you should add it if you want to split the instruction)
+
+<prompt_former.instruction> 
+[
+  <prompt_former.input_text_prefixes[0]> 
+  <prompt_former.triplet_dataset.demonstration.get_input_text(index)
+  <prompt_former.input_text_prefixes[0]>
+
+  <prompt_former.input_text_prefixes[1]> 
+  <prompt_former.triplet_dataset.demonstration.get_input_text(index)
+  <prompt_former.input_text_prefixes[1]>
+  ...
+  <prompt_former.label_prefix> 
+  <prompt_former.label(index)> 
+  <prompt_former.label_afffix>
+] * k (k = demostration numbers)
+<prompt_former.query_prefix>
+[
+  <prompt_former.input_text_prefixes[0]> 
+  <prompt_former.triplet_dataset.test.get_input_text(index)>
+  <prompt_former.input_text_prefixes[0]>
+
+  <prompt_former.input_text_prefixes[1]> 
+  <prompt_former.triplet_dataset.test.get_input_text(index)>
+  <prompt_former.input_text_prefixes[1]>
+  ...
+  <prompt_former.label_prefix> [MASKED]
+]
+```
+
+You can also use `set_config_dict(config_dict)` to set the prompt template by a dictionary, and load the current setting by `get_config_dict()`. The dictionary should have the following keys:
+
+``` python
+{
+    'instruction': str,
+    'input_text_prefixes': list[str],
+    'input_text_affixes': list[str],
+    'label_prefix': str,
+    'label_affix': str,
+    'query_prefix': str,
+    'label_space': list[str],
+    'label_wrong_rate': float,
+    'use_noisy_channel': bool
+}
+```
+
+Notice that you can not use the dictionary to save all the status of the `prompt_former`, only the above keys are valid.
+
+**Tips**
+
+- You can call `prompt_former.example()` to observe an example of the prompt.
+- These templates are defaultly defined in the `hgf_dataset_loader.py`. Call `prompt_former.reset()` to reset the prompt template to default.
+
+### Custom Inference
+
+You can use a custom inference function for each dataset, which can be set by the inference function `experimentor.auto_run(forward_inference = my_inference)` where the `forward_inference` should be a function with the prototype `forward_inference(prompt: str, label_space: list[str]) -> Union[list[float], int]`; or `<sub-benchmark>.auto_run(list_of_forward_inference = my_inferences)`, where the `list_of_forward_inference` should be a list of functions with the prototype `forward_inference(prompt: str, label_space: list[str]) -> Union[list[float], int]`, with index aligned with the dataset index.
+
+If you wish to perform any **preprocessing** on the inference function, such as learning a calibration, you should complete this process in advance (note: we have prepared some additional data for such preprocessing in `experimentor.calibration_set()`, it is a standard [`basic_datasets_loader` object](#dataset_loader)) while maintaining the function interface as described above. There are only two exceptions: (descirbed below) 1. You intend to use a batched inference process, providing an input list and requesting an output list. 2. You wish to directly evaluate existing prediction values.
+
+#### Batched Inference
+
+If you want to use a batched inference process, you can set `batched_inference=True` in the `auto_run` function. The prototype of the batched inference function should be `batched_inference(prompts: list[str], label_space: list[str]) -> list[list[float]]` or `batched_inference(prompts: list[str], label_space: list[str]) -> list[int]`. An example with [Batch Calibration](https://arxiv.org/abs/2309.17249) is shown in `examples/batched_inference.ipynb`.
+
+#### Preentered Prediction
+
+If you already have all the inference results (`list[list[float]]` for probabilites / logits, or `list[int]` for label index) aligned with the `experimentor.prompt_set()`, you can directly input them by the `preentered_prediction`, a `list[list[float]]` object to store the pre-entered prediction of the model. The shape should be `(len(experimentor.prompt_set()), len(get_label_space()))`. When you use `preentered_prediction`, `forward_inference` will be ignored.
+
+#### Calibration
+
+You can train a calibration function above the normal output of LMs, by the remained `experimentor.calibration_set()` and set it to the inference function. We have some standard calibration functions in `StaICC.prefabricate_inference.standard_calibration`, and the `model_kernel.standard_ICL_inference_with_torch_Causal_LM` can be adopt to these calibration functions. An example with [Hidden Calibration](https://arxiv.org/abs/2406.16535) is shown in `examples/calibration.ipynb`.
+
+#### Noisy Channel Inference
+
+Noisy Channel use a resevered prompt like `<label><input_text><label><input_text>...` as the input. Refer to [Noisy Channel Language Model Prompting for Few-Shot Text Classification](https://aclanthology.org/2022.acl-long.365/) for details. To use this inference, you should set the `noisy_channel = True` when you load the benchmark. For example,
+
+```python
+from StaICC import Normal
+benchmark = Normal(k = 16, noisy_channel = True)
+```
+
+One more example is shown in `examples/noisy_channel.ipynb`.
+
+<!-- ## Examples
+
+More examples are shown in the `examples` folder.
+
+<span id="prompt_sample"></span>
+### Example 1: Use manual demonstration sequence in your experiment
 
 ### Example 2: Use different inference function for each dataset
 
+ -->
 
+### Custom Metric
 
+You can simply set the `return_outputs=True` in the `auto_run` function to return the direct outputs of the inference function, then conduct your own metric calculation. Or, you can add your metric, which should be shaped like `metric(ground_truth: list[int], prediction: list[list[float]]) -> float`, by the `experimentor.add_metric(name: str, metric: Callable[ground_truth: list[int], prediction: list[list[float]]])` function.
 
+## Sub-benchmarks
 
 ## Detailed Documentation
+
+**Bottom Dataset Loader and Interface**
 
 <span id="dataset_loader"></span>
 ### `basic_datasets_loader` class
 
 The `basic_datasets_loader` class is a class to load the dataset and define the inference behavior on these dataset. Generally, you should not access this class directly. It is recommended to access it through the `*_set()` functions of `single_experimentor`.
 
-**Notice: if you access this class from `*_set()` functions of `single_experimentor`, you should be only care about the following functions:**
+Notice: if you access this class from `*_set()` functions of `single_experimentor`, you should be only care about the following functions:
 
 #### `__getitem__(index: int) -> Tuple[list[str], int]`
 
@@ -350,6 +392,10 @@ Transfer label index to label text.
 ### `single_experimentor` class
 
 As the basic module of StaICC, the `single_experimentor` class is a class to control the experiment process of a single dataset. 
+
+#### `add_metric(name: str, metric: Callable[ground_truth: list[int], prediction: list[list[float]]])`
+
+Add a metric to the experiment. The parameter `name` is the name of the metric, and the parameter `metric` is a callable object with the prototype `metric(ground_truth: list[int], prediction: list[list[float]]) -> float`.
 
 #### `set_k(k: int)`
 

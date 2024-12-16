@@ -57,6 +57,7 @@ class triplet_dataset():
         self.calibration.rename_dataset(original_dataset_loader.get_dataset_name()+"-calibration")
         self.demonstration.rename_dataset(original_dataset_loader.get_dataset_name()+"-demonstration")
         self.test.rename_dataset(original_dataset_loader.get_dataset_name()+"-test")
+        self.alternate_template = original_dataset_loader.get_alternate_template()
     
     def __str__(self) -> str:
         return ("Calibration set: \n" + self.calibration.__str__() + "\nDemonstration set: \n" + self.demonstration.__str__() + "\nTest set: \n" + self.test.__str__())
@@ -78,6 +79,9 @@ class triplet_dataset():
             if calibration_number != configs.STANDARD_SETTINGS["calibration_number"] or demonstration_number != configs.STANDARD_SETTINGS["demonstration_number"] or test_number != configs.STANDARD_SETTINGS["test_number"]:
                 warnings.warn(configs.WARNING_SETTINGS["tampering"])
     
+    def get_alternate_template(self):
+        return copy.deepcopy(self.alternate_template)
+
     def get_dataset_name(self):
         return self.dataset_name
     
@@ -301,9 +305,16 @@ class prompt_writter():
         self.label_wrong_rate = label_wrong_rate
 
     def use_noisy_channel(self, new_label_affix = " ", new_last_input_affix = "\n"):
-        self._noisy_channel = True
-        self._label_affix = new_label_affix
-        self._input_text_affixes[-1] = new_last_input_affix
+        if not self._noisy_channel:
+            self._noisy_channel = True
+            self._label_affix = new_label_affix
+            self._input_text_affixes[-1] = new_last_input_affix
+
+    def cancel_noisy_channel(self):
+        if self._noisy_channel:
+            self._noisy_channel = False
+            self._label_affix = self._triplet_dataset.demonstration.get_label_affix()
+            self._input_text_affixes[-1] = self._triplet_dataset.demonstration.get_input_text_affixes()[-1]
 
     def __str__(self) -> str:
         return (
@@ -327,6 +338,43 @@ class prompt_writter():
         ret += "\nWith:\n"
         ret += self._triplet_dataset.__repr__()
         return ret
+    
+    def get_config_dict(self):
+        return {
+            "instruction": copy.deepcopy(self._instruction),
+            "input_text_prefixes": copy.deepcopy(self._input_text_prefixes),
+            "input_text_affixes": copy.deepcopy(self._input_text_affixes),
+            "label_prefix": copy.deepcopy(self._label_prefix),
+            "label_affix": copy.deepcopy(self._label_affix),
+            "query_prefix": copy.deepcopy(self._query_prefix),
+            "label_space": copy.deepcopy(self._label_space),
+            "label_wrong_rate": self.label_wrong_rate,
+            "use_noisy_channel": self._noisy_channel,
+        }
+    
+    def set_config_dict(self, config_dict: dict):
+        self.reset()
+        if "instruction" in config_dict:
+            self.change_instruction(config_dict["instruction"])
+        if "input_text_prefixes" in config_dict:
+            self.change_input_text_prefixes(config_dict["input_text_prefixes"])
+        if "input_text_affixes" in config_dict:
+            self.change_input_text_affixes(config_dict["input_text_affixes"])
+        if "label_prefix" in config_dict:
+            self.change_label_prefix(config_dict["label_prefix"])
+        if "label_affix" in config_dict:
+            self.change_label_affix(config_dict["label_affix"])
+        if "query_prefix" in config_dict:
+            self.change_query_prefix(config_dict["query_prefix"])
+        if "label_space" in config_dict:
+            self.change_label_space(config_dict["label_space"])
+        if "label_wrong_rate" in config_dict:
+            self.set_label_wrong_rate(config_dict["label_wrong_rate"])
+        if "use_noisy_channel" in config_dict:
+            if config_dict["use_noisy_channel"]:
+                self.use_noisy_channel()
+            else:
+                self.reset()
     
     def get_label_of_test_samples(self, query_index: int):
         if query_index < 0 or query_index >= len(self._triplet_dataset.test):

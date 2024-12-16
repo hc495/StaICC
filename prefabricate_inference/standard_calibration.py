@@ -46,7 +46,7 @@ class contextual_calibration(calibration):
             label_space_prob = feedforward(prompt = prompt, label_space = self.label_space)
             self.calibrationA = [self.calibrationA[j] + label_space_prob[j] for j in range(self.n_label)]
         self.calibrationA = [self.calibrationA[j] / calibration_number for j in range(self.n_label)]
-        print("Calibration Training Finished.\n")
+        print("\nCalibration Training Finished.\n")
     
     def inference(self, label_space_prob, full_vocab_prob, hidden_state) -> list[float]:
         return functional.softmax([label_space_prob[j] / self.calibrationA[j] for j in range(self.n_label)])
@@ -99,7 +99,7 @@ class domain_calibration(calibration):
             label_space_prob = feedforward(prompt = prompt, label_space = self.label_space)
             self.calibrationA = [self.calibrationA[j] + label_space_prob[j] for j in range(self.n_label)]
         self.calibrationA = [self.calibrationA[j] / calibration_number for j in range(self.n_label)]
-        print("Calibration Training Finished.\n")
+        print("\nCalibration Training Finished.\n")
     
     def inference(self, label_space_prob, full_vocab_prob, hidden_state) -> list[float]:
         return functional.softmax([label_space_prob[j] / self.calibrationA[j] for j in range(self.n_label)])
@@ -177,7 +177,7 @@ class hidden_calibration(calibration):
                 for i in range(len(hidden_state)):
                     sum[i] += hidden_state[i]
             self.centroid.append([x / len(list) for x in sum])
-        print("Calibration Training Finished.\n")
+        print("\nCalibration Training Finished.\n")
 
     def inference(self, label_space_prob, full_vocab_prob, hidden_state) -> list[float]:
         if self.failed:
@@ -246,7 +246,7 @@ class knn_prompt(calibration):
                 warnings.warn("Some categories didn't present in the calibration set: " + str(calibration_set.get_dataset_name()))
                 self.failed = True
                 return
-        print("Calibration Training Finished.\n")
+        print("\nCalibration Training Finished.\n")
     
     def inference(self, label_space_prob, full_vocab_prob, hidden_state) -> list[float]:
         if self.failed:
@@ -307,7 +307,7 @@ class knn_prompt_centroid(calibration):
                     for k in range(len(self.anchors[j])):
                         sum[k] += self.anchors[j][k]
             self.centroid.append([x / self.label_statics[i] for x in sum])
-        print("Calibration Training Finished.\n")
+        print("\nCalibration Training Finished.\n")
     
     def inference(self, label_space_prob, full_vocab_prob, hidden_state) -> list[float]:
         if self.failed:

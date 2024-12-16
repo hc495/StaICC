@@ -165,6 +165,9 @@ class basic_datasets_loader():
     def get_label_space(self):
         return self._label_space
     
+    def get_alternate_template(self):
+        return self.alternate_template
+    
     def change_instruction(self, instruction: str):
         if configs.STRICT_MODE:
             warnings.warn(configs.WARNING_SETTINGS["basic_dataset_template_protect"])
@@ -286,6 +289,13 @@ class glue_sst2(basic_datasets_loader):
         self._long_text_classification = long_text_classification
         self.input_element_numbers = 1
 
+        self.alternate_template = {
+            "instruction": ["", "How would you describe the overall feeling of the movie based on this sentence? ", "Please classify the sentiment of the following sentence. "],
+            "input_text_prefixes": [["sentence: "], ["text: "], ["review: "]],
+            "label_prefix": ["sentiment: ", "label: ", "Label: "],
+            "label_affix": ["\n", " ", "\t"],
+        }
+
         if not from_cache:
             import datasets
             self._hgf_dataset = datasets.load_dataset("glue", "sst2")['train']
@@ -319,6 +329,13 @@ class rotten_tomatoes(basic_datasets_loader):
         self.label_space_numbers = len(self._label_space)
         self.input_element_numbers = 1
 
+        self.alternate_template = {
+            "instruction": ["", "How would you describe the overall feeling of the movie based on this sentence? ", "Please classify the sentiment of the following sentence. "],
+            "input_text_prefixes": [["review: "], ["text: "], ["sentence: "]],
+            "label_prefix": ["sentiment: ", "label: ", "Label: "],
+            "label_affix": ["\n", " ", "\t"],
+        }
+
         if not from_cache:
             import datasets
             self._hgf_dataset = datasets.load_dataset("cornell-movie-review-data/rotten_tomatoes")['train']
@@ -351,6 +368,13 @@ class financial_phrasebank(basic_datasets_loader):
         self._long_text_classification = long_text_classification
         self.input_element_numbers = 1
         self.label_space_numbers = len(self._label_space)
+
+        self.alternate_template = {
+            "instruction": ["", "What is the attitude towards the financial news in this sentence? ", "What is the emotional response to the financial news in this sentence? "],
+            "input_text_prefixes": [["sentence: "], ["text: "], ["news: "]],
+            "label_prefix": ["sentiment: ", "label: ", "Label: "],
+            "label_affix": ["\n", " ", "\t"],
+        }
 
         if not from_cache:
             import datasets
@@ -388,6 +412,13 @@ class sst5(basic_datasets_loader):
         self.reduct_label_token()
         self.label_space_numbers = len(self._label_space)
 
+        self.alternate_template = {
+            "instruction": ["", "How would you describe the overall feeling of the movie based on this sentence? ", "What mood does this sentence convey about the movie? "],
+            "input_text_prefixes": [["sentence: "], ["text: "], ["review: "]],
+            "label_prefix": ["sentiment: ", "label: ", "Label: "],
+            "label_affix": ["\n", " ", "\t"],
+        }
+
         if not from_cache:
             import datasets
             self._hgf_dataset = datasets.load_dataset("SetFit/sst5", "sentences_allagree")['train']
@@ -424,6 +455,13 @@ class trec(basic_datasets_loader):
         self.label_space_numbers = len(self._label_space)
         self._long_text_classification = long_text_classification
         self.input_element_numbers = 1
+
+        self.alternate_template = {
+            "instruction": ["", "What is the topic of the question? ", "What is the primary focus of this question? "],
+            "input_text_prefixes": [["question: "], ["text: "], ["sentence: "]],
+            "label_prefix": ["target: ", "label: ", "Label: "],
+            "label_affix": ["\n", " ", "\t"],
+        }
 
         if not from_cache:
             import datasets
@@ -463,6 +501,13 @@ class agnews(basic_datasets_loader):
         self.reduct_label_token()
         self.label_space_numbers = len(self._label_space)
 
+        self.alternate_template = {
+            "instruction": ["", "What is the topic of the news? ", "What is the news focused on? "],
+            "input_text_prefixes": [["news: "], ["text: "], ["sentence: "]],
+            "label_prefix": ["topic: ", "label: ", "Label: "],
+            "label_affix": ["\n", " ", "\t"],
+        }
+
         if not from_cache:
             import datasets
             self._hgf_dataset = datasets.load_dataset("ag_news")
@@ -499,6 +544,13 @@ class subjective(basic_datasets_loader):
         self.reduct_label_token()
         self.input_element_numbers = 1
         self.label_space_numbers = len(self._label_space)
+
+        self.alternate_template = {
+            "instruction": ["", "Does this sentence reflect a personal opinion? ", "Is this sentence expressing a personal opinion or stating a fact? "],
+            "input_text_prefixes": [["review: "], ["text: "], ["sentence: "]],
+            "label_prefix": ["subjectiveness: ", "label: ", "Label: "],
+            "label_affix": ["\n", " ", "\t"],
+        }
 
         if not from_cache:
             import datasets
@@ -537,6 +589,13 @@ class tweet_eval_emotion(basic_datasets_loader):
         self.input_element_numbers = 1
         self.label_space_numbers = len(self._label_space)
 
+        self.alternate_template = {
+            "instruction": ["", "What feeling does this sentence convey? ", "What emotion does this sentence express? "],
+            "input_text_prefixes": [["tweet: "], ["text: "], ["sentence: "]],
+            "label_prefix": ["emotion: ", "label: ", "Label: "],
+            "label_affix": ["\n", " ", "\t"],
+        }
+
         if not from_cache:
             import datasets
             self._hgf_dataset = datasets.load_dataset("tweet_eval", "emotion")
@@ -574,6 +633,13 @@ class tweet_eval_hate(basic_datasets_loader):
         self.input_element_numbers = 1
         self.label_space_numbers = len(self._label_space)
 
+        self.alternate_template = {
+            "instruction": ["", "Does this sentence contain hate speech? ", "Is this sentence an example of hate speech? "],
+            "input_text_prefixes": [["tweet: "], ["text: "], ["sentence: "]],
+            "label_prefix": ["hate speech: ", "label: ", "Label: "],
+            "label_affix": ["\n", " ", "\t"],
+        }
+
         if not from_cache:
             import datasets
             self._hgf_dataset = datasets.load_dataset("tweet_eval", "hate")['train']
@@ -610,6 +676,13 @@ class hate_speech_18(basic_datasets_loader):
         self.input_element_numbers = 1
         self.reduct_label_token()
         self.label_space_numbers = len(self._label_space)
+
+        self.alternate_template = {
+            "instruction": ["", "Does this sentence contain hate speech? ", "Is this sentence an example of hate speech? "],
+            "input_text_prefixes": [["tweet: "], ["text: "], ["sentence: "]],
+            "label_prefix": ["hate speech: ", "label: ", "Label: "],
+            "label_affix": ["\n", " ", "\t"],
+        }
 
         if not from_cache:
             import datasets

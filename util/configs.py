@@ -20,6 +20,17 @@ STANDARD_SETTINGS = {
         "demonstration_number": 3192,
         "test_number": 512
     },
+    "L9(3,4)_orthogonal_table": [
+        [0, 0, 0, 0],
+        [0, 1, 1, 1],
+        [0, 2, 2, 2],
+        [1, 0, 1, 2],
+        [1, 1, 2, 0],
+        [1, 2, 0, 1],
+        [2, 0, 2, 1],
+        [2, 1, 0, 2],
+        [2, 2, 1, 0]
+    ]
 }
 
 STRICT_MODE = True
@@ -63,7 +74,7 @@ PPL_ICL_INSTRUCTION_SETTINGS = {
         "What impression does the reviewer have of the movie? "
     ],
     "TREC": [
-        "What is the topic of the question?",
+        "What is the topic of the question? ",
         "What is the primary focus of this question? ",
         "What is the central subject of this question? ",
         "What does the question concern? ",

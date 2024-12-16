@@ -1,6 +1,7 @@
 from . import configs, functional, stable_random, dataset_interface
 import copy
 import warnings
+import functools
 
 class single_experimentor():
     """
@@ -118,6 +119,11 @@ class single_experimentor():
             warnings.warn("The length of the demonstration indexes should be equal to k, in test index: " + str(index))
         return self.prompt_former.write_prompt(demos_indexes, test_sample_index)
 
+    def add_metric(self, metric_name: str, metric_function: callable):
+        if metric_name in self.metrics:
+            warnings.warn("The metric name already exists. Overwriting the metric function.")
+        self.metrics[metric_name] = metric_function
+
     def set_k(self, k: int):
         self.reset_demonstration_sampler()
         self._k = k
@@ -221,15 +227,21 @@ class single_experimentor():
         forward_inference: callable = None, 
             # When batched_inference is disabled, forward_inference: (prompt: str, label_space: list[str]) -> list[float] <logits> or int <label>. The inputted parameter signs are fixed to prompt and label_space.
             # When batched_inference is enabled, forward_inference: (prompts: list[str], label_space: list[str]) -> list[list[float]] <logits> or list[int] <label>.
-        preentered_prediction = None, # The prediction for the test set (list[int]). If None, the prediction will be calculated by the forward_inference.
-        batched_inference = False, # for batched inference like BatchCalibration.
+        preentered_prediction = None, 
+            # The prediction for the test set (list[int]). If None, the prediction will be calculated by the forward_inference.
+        batched_inference = False, 
+            # for batched inference like BatchCalibration.
             # If enabled, we will input all the prompts into the forward_inference; and if disabled, we will input the prompt into the forward_inference one by one
-        return_outputs = False # If True, the outputs will be returned.
+        return_outputs = False, 
+            # If True, the outputs will be returned.
+        _previous_prediction = None 
+            # If you need to connect multiple inference results, please set it to the previous prediction.
     ):
         # The forward_inference function should be a callable that takes a prompt and returns a list of label logits or a label index.
         # We encourage the forward_inference function to be a function that takes a prompt and returns a list of logits for each label, so that we can calculate more metrics.
         # >> If you use a function that returns a label index, the metrics that require logits will be calculated as if the logits are one-hot encoded.
         success = False
+        
         if self._k > len(self.triplet_dataset.demonstration):
             warnings.warn("The k value is larger than the length of the demonstration dataset. Return all-0 results.")
             ret = {}
@@ -280,6 +292,9 @@ class single_experimentor():
         ret = {}
         for metric_name, metric_function in self.metrics.items():
             self.predictions = functional.extend_onehot_prediction_to_logits(prediction)
+            if _previous_prediction is not None:
+                print("\nPrevious prediction is given. Connecting the previous prediction with length " + str(len(_previous_prediction)) + ".\n")
+                self.predictions = _previous_prediction + self.predictions
             ret[metric_name] = metric_function(ground_truth, self.predictions)
         success = True
         if return_outputs:
@@ -383,12 +398,16 @@ class sensitivity_experimentor(single_experimentor):
     def _sensitivity_step(self):
         pass
 
-    def inference_run(self, forward_inference: callable, batched_inference=False):
+    def inference_run(self, forward_inference: callable, batched_inference=False, _previous_prediction = False):
         result_dicts = []
         self._sensitivity_init()
         for i in range(self.test_times):
-            result_dicts.append(super().auto_run(forward_inference = forward_inference, batched_inference = batched_inference)[0])
-            self._sensitivity_step()
+            if _previous_prediction:
+                result_dicts.append(super().auto_run(forward_inference = forward_inference, batched_inference = batched_inference, _previous_prediction = copy.deepcopy(self.predictions))[0])
+            else:
+                result_dicts.append(super().auto_run(forward_inference = forward_inference, batched_inference = batched_inference, _previous_prediction = None)[0])
+            if i != self.test_times - 1:
+                self._sensitivity_step()
         return result_dicts
 
 
@@ -429,7 +448,9 @@ class GLER_experimentor(sensitivity_experimentor):
         input_prediction = None, # Unused
         batched_inference = False, # for batched inference like BatchCalibration.
             # If enabled, we will input all the prompts into the forward_inference; and if disabled, we will input the prompt into the forward_inference one by one
-        return_outputs = False # Unused
+        return_outputs = False, # Unused
+        preentered_prediction = None, # Unused
+        _previous_prediction = None # Unused
     ):
         result_dicts = {}
         sensitivity_dict = {}
@@ -446,4 +467,94 @@ class GLER_experimentor(sensitivity_experimentor):
                 temp_results.append(res[metric_name])
             sensitivity_dict[metric_name] = functional.linear_regression(arguments, temp_results)
         result_dicts["sensitivity"] = sensitivity_dict
+        return result_dicts, True
+    
+
+class template_sensitivity_experimentor(sensitivity_experimentor):
+    def __init__(self, 
+        triplet_dataset = None, 
+        original_dataset = None, 
+        k: int = 4, 
+        metrics: dict = {
+            "consistency": functional.consistency,
+        }, # DICT: {metric_name: metric_function}  metric_function: (ground_truth: list[int], prediction: list[list[float]] <logits>) -> float
+        repeat_times = 1,
+        dividing = [configs.STANDARD_SETTINGS["calibration_number"], configs.STANDARD_SETTINGS["demonstration_number"], 100], # A list of integers that divides the test samples into 4 splits. The first split will be used for calibration, the second split will be used for demonstration, the third split will be used for testing, and the fourth split will be used for sensitivity test. Only can be used when original_dataset is given.
+        orthogonal_table = configs.STANDARD_SETTINGS["L9(3,4)_orthogonal_table"]
+    ):
+        super().__init__(triplet_dataset = triplet_dataset, original_dataset=original_dataset, k=k, metrics=metrics, repeat_times=repeat_times, dividing=dividing, sensitivity_test=len(orthogonal_table))
+        self.current_try = 0
+        self.orthogonal_table = orthogonal_table
+        self.alternate_template = self.triplet_dataset.get_alternate_template()
+
+    def _set_template(self, try_index):
+        setting_index = self.orthogonal_table[try_index]
+        dictionary = {}
+        for i, key in enumerate(self.alternate_template.keys()):
+            dictionary[key] = self.alternate_template[key][setting_index[i]]
+        self.prompt_former.set_config_dict(dictionary)
+
+    def _sensitivity_init(self):
+        self.current_try = 0
+        self._set_template(self.current_try)
+    
+    def _sensitivity_step(self):
+        self.current_try += 1
+        self._set_template(self.current_try)
+    
+    def auto_run(self, 
+        forward_inference: callable, 
+            # When batched_inference is disabled, forward_inference: (prompt: str, label_space: list[str]) -> list[float] <logits> or int <label>. The inputted parameter signs are fixed to prompt and label_space.
+            # When batched_inference is enabled, forward_inference: (prompts: list[str], label_space: list[str]) -> list[list[float]] <logits> or list[int] <label>.
+        input_prediction = None, # Unused
+        batched_inference = False, # for batched inference like BatchCalibration.
+            # If enabled, we will input all the prompts into the forward_inference; and if disabled, we will input the prompt into the forward_inference one by one
+        return_outputs = False, # Unused
+        preentered_prediction = None, # Unused
+        _previous_prediction = None # Unused
+    ):
+        result_dicts = {}
+        intermidiate_results = self.inference_run(forward_inference, batched_inference, _previous_prediction=True)
+        result_dicts["sensitivity"] = intermidiate_results[-1]
+        return result_dicts, True
+    
+
+# Untested, 2024/12/13
+class demonstration_sensitivity_experimentor(sensitivity_experimentor):
+    def __init__(self, 
+        triplet_dataset = None, 
+        original_dataset = None, 
+        k: int = 4, 
+        metrics: dict = {
+            "consistency": functools.partial(functional.consistency, loop_length = 128),
+        }, # DICT: {metric_name: metric_function}  metric_function: (ground_truth: list[int], prediction: list[list[float]] <logits>) -> float
+        repeat_times = 1,
+        dividing = [configs.STANDARD_SETTINGS["calibration_number"], configs.STANDARD_SETTINGS["demonstration_number"], configs.STANDARD_SETTINGS["test_number"]], # A list of integers that divides the test samples into 4 splits. The first split will be used for calibration, the second split will be used for demonstration, the third split will be used for testing, and the fourth split will be used for sensitivity test. Only can be used when original_dataset is given.
+        sensitivity_test = 8
+    ):
+        inner_repeat_times = 2
+        super().__init__(triplet_dataset = triplet_dataset, original_dataset=original_dataset, k=k, metrics=metrics, repeat_times=inner_repeat_times, dividing=dividing, sensitivity_test=1)
+        self.triplet_dataset.test.cut_by_index(len(self.triplet_dataset.test) * inner_repeat_times // sensitivity_test)
+        self._repeat_times = sensitivity_test
+
+    def _sensitivity_init(self):
+        return
+    
+    def _sensitivity_step(self):
+        return
+    
+    def auto_run(self, 
+        forward_inference: callable, 
+            # When batched_inference is disabled, forward_inference: (prompt: str, label_space: list[str]) -> list[float] <logits> or int <label>. The inputted parameter signs are fixed to prompt and label_space.
+            # When batched_inference is enabled, forward_inference: (prompts: list[str], label_space: list[str]) -> list[list[float]] <logits> or list[int] <label>.
+        input_prediction = None, # Unused
+        batched_inference = False, # for batched inference like BatchCalibration.
+            # If enabled, we will input all the prompts into the forward_inference; and if disabled, we will input the prompt into the forward_inference one by one
+        return_outputs = False, # Unused
+        preentered_prediction = None, # Unused
+        _previous_prediction = None # Unused
+    ):
+        result_dicts = {}
+        intermidiate_results = self.inference_run(forward_inference, batched_inference, _previous_prediction=False)
+        result_dicts["sensitivity"] = intermidiate_results[-1]
         return result_dicts, True
