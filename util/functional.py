@@ -34,7 +34,7 @@ def linear_regression(x, y):
     b = (sum_y - a * sum_x) / n
     return a, b
 
-def two_d_list_mean(x):
+def two_dimensional_list_mean(x):
     sum = [0] * len(x[0])
     for x_i in x:
         for i in range(len(x_i)):
@@ -42,17 +42,17 @@ def two_d_list_mean(x):
     return [x_i / len(x) for x_i in sum]
 
 def bias_mean_metric(ground_truth, prediction):
-    return two_d_list_mean(prediction)
+    return two_dimensional_list_mean(prediction)
 
 def bias_mean_entropy_metric(ground_truth, prediction):
-    return entropy(two_d_list_mean(prediction))
+    return entropy(two_dimensional_list_mean(prediction))
 
 def post_bias_dis_metric(ground_truth, prediction):
     label_dis = [0] * len(prediction[0])
     for i in range(len(ground_truth)):
         label_dis[ground_truth[i]] += 1
     label_dis = [x / len(ground_truth) for x in label_dis]
-    averaged_prediction = two_d_list_mean(prediction)
+    averaged_prediction = two_dimensional_list_mean(prediction)
     return [prediction_i - label_dis_i for prediction_i, label_dis_i in zip(averaged_prediction, label_dis)]
 
 def kl_divergence(x, y):
@@ -65,7 +65,7 @@ def post_bias_dl_metric(ground_truth, prediction):
     for i in range(len(ground_truth)):
         label_dis[ground_truth[i]] += 1
     label_dis = [x / len(ground_truth) for x in label_dis]
-    averaged_prediction = two_d_list_mean(prediction)
+    averaged_prediction = two_dimensional_list_mean(prediction)
     return kl_divergence(averaged_prediction, label_dis)
 
 def softmax(x):
@@ -82,7 +82,7 @@ def entropy(x): # nats
     if type(x[0]) != list:
         return -sum([x_i * math.log(x_i) for x_i in x if x_i != 0])
     else:
-        return entropy(two_d_list_mean(x))
+        return entropy(two_dimensional_list_mean(x))
 
 def argmax(x):
     return max(range(len(x)), key=lambda i: x[i])

@@ -63,7 +63,7 @@ to install this library. -->
 
 2. **Domainal Bias**: Introduced by [Mitigating Label Biases for In-context Learning](http://arxiv.org/abs/2305.19148), domainal bias measures the bias when some demonstrations and a query of randomly sampled tokens from the test dataset is fed into the model. We use the entropy of the averaged prediction probabilites as the metric.
 
-3. **Posterior Bias**: Measures the bias (we use DL divergence for the metric) from the predicted probability to the frequency of the ground-truth label.
+3. **Posterior Bias**: Measures the bias (we use KL divergence for the metric) from the predicted probability to the frequency of the ground-truth label.
 
 You can use them dividedly by `from StaICC import Contextual_bias, Domain_bias, Post_bias`.
 
