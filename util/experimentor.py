@@ -141,7 +141,7 @@ class single_experimentor():
         # wash the demonstration sampler
         wash_list = []
         for i in range(len(self.triplet_dataset.test) * self._repeat_times):
-            label = self.triplet_dataset.get_default_ground_truth_label_from_index(i % len(self.triplet_dataset.test))
+            label = self.triplet_dataset.get_default_ground_truth_label_index(i % len(self.triplet_dataset.test))
             demonstration_indexes = self.demonstration_sampler[i]
             for index in demonstration_indexes:
                 if self.triplet_dataset.demonstration.find_index_from_label(self.triplet_dataset.demonstration[index][1]) == label:
@@ -149,7 +149,7 @@ class single_experimentor():
                     break
 
         for i in wash_list:
-            label = self.triplet_dataset.get_default_ground_truth_label_from_index(i % len(self.triplet_dataset.test))
+            label = self.triplet_dataset.get_default_ground_truth_label_index(i % len(self.triplet_dataset.test))
             success = False
             while True:
                 success = True
@@ -167,7 +167,7 @@ class single_experimentor():
         # wash the demonstration sampler
         wash_list = []
         for i in range(len(self.triplet_dataset.test) * self._repeat_times):
-            label = self.triplet_dataset.get_default_ground_truth_label_from_index(i % len(self.triplet_dataset.test))
+            label = self.triplet_dataset.get_default_ground_truth_label_index(i % len(self.triplet_dataset.test))
             demonstration_indexes = self.demonstration_sampler[i]
             label_exist = False
             for index in demonstration_indexes:
@@ -178,7 +178,7 @@ class single_experimentor():
                 wash_list.append(i)
 
         for i in wash_list:
-            label = self.triplet_dataset.get_default_ground_truth_label_from_index(i % len(self.triplet_dataset.test))
+            label = self.triplet_dataset.get_default_ground_truth_label_index(i % len(self.triplet_dataset.test))
             success = False
             while True:
                 success = False
@@ -261,7 +261,7 @@ class single_experimentor():
                     for index in range(len(self.triplet_dataset.test)):
                         prompt = self._get_prompts_for_test_sample(index, time)
                         result = forward_inference(prompt = prompt, label_space = self.prompt_former.get_label_space()) # The inputted parameter signs are fixed to prompt and label_space.
-                        ground_truth.append(self.triplet_dataset.get_default_ground_truth_label_from_index(index))
+                        ground_truth.append(self.triplet_dataset.get_default_ground_truth_label_index(index))
                         self.label_dis[ground_truth[-1]] += 1
                         prediction.append(result)
                         print("\r", end="")
@@ -276,13 +276,13 @@ class single_experimentor():
                 for time in range(self._repeat_times):
                     for index in range(len(self.triplet_dataset.test)):
                         prompts.append(self._get_prompts_for_test_sample(index, time))
-                        ground_truth.append(self.triplet_dataset.get_default_ground_truth_label_from_index(index))
+                        ground_truth.append(self.triplet_dataset.get_default_ground_truth_label_index(index))
                         self.label_dis[ground_truth[-1]] += 1
                 prediction = forward_inference(prompt = prompts, label_space = self.prompt_former.get_label_space())
         elif preentered_prediction is not None:
             for time in range(self._repeat_times):
                 for index in range(len(self.triplet_dataset.test)):
-                    ground_truth.append(self.triplet_dataset.get_default_ground_truth_label_from_index(index))
+                    ground_truth.append(self.triplet_dataset.get_default_ground_truth_label_index(index))
                     self.label_dis[ground_truth[-1]] += 1
             prediction = preentered_prediction
         else:
@@ -328,13 +328,25 @@ class prior_bias_experimentor(single_experimentor):
     ):
         if bias_type not in ["contextual", "domain"]:
             raise ValueError("bias_type should be 'contextual' or 'domain'.")
-        super().__init__(triplet_dataset, original_dataset, k, metrics, repeat_times, dividing, noisy_channel)
+        super().__init__(
+            triplet_dataset = triplet_dataset, 
+            original_dataset = original_dataset, 
+            k = k, 
+            metrics = metrics, 
+            repeat_times = repeat_times, 
+            dividing = dividing, 
+            noisy_channel = noisy_channel
+        )
         self.bias_type = bias_type
         if bias_type == "contextual":
             self.meanless_query = self._gen_empty_query()
         elif bias_type == "domain":
             self.meanless_query = self._gen_domain_query(self.triplet_dataset.demonstration, domain_query_length)
-        self.prompt_former = dataset_interface.prompt_writter(self.triplet_dataset, noisy_channel, self.meanless_query)
+        self.prompt_former = dataset_interface.prompt_writter(
+            triplet_dataset = self.triplet_dataset, 
+            use_noisy_channel = noisy_channel, 
+            pseudo_query_generater = self.meanless_query
+        )
 
     def _gen_empty_query(self):
         while True:
@@ -389,7 +401,15 @@ class sensitivity_experimentor(single_experimentor):
         dividing = [configs.STANDARD_SETTINGS["calibration_number"], configs.STANDARD_SETTINGS["demonstration_number"], configs.STANDARD_SETTINGS["test_number"]], # A list of integers that divides the test samples into 4 splits. The first split will be used for calibration, the second split will be used for demonstration, the third split will be used for testing, and the fourth split will be used for sensitivity test. Only can be used when original_dataset is given.
         noisy_channel = False # If True, the demonstration set will be generated by a noisy channel model.
     ):
-        super().__init__(triplet_dataset, original_dataset, k, metrics, repeat_times, dividing, noisy_channel)
+        super().__init__(
+            triplet_dataset = triplet_dataset, 
+            original_dataset = original_dataset, 
+            k = k, 
+            metrics = metrics, 
+            repeat_times = repeat_times, 
+            dividing = dividing, 
+            noisy_channel = noisy_channel
+        )
         self.test_times = sensitivity_test
     
     def _sensitivity_init(self):
@@ -427,7 +447,16 @@ class GLER_experimentor(sensitivity_experimentor):
         dividing = [configs.STANDARD_SETTINGS["calibration_number"], configs.STANDARD_SETTINGS["demonstration_number"], configs.STANDARD_SETTINGS["test_number"]], # A list of integers that divides the test samples into 4 splits. The first split will be used for calibration, the second split will be used for demonstration, the third split will be used for testing, and the fourth split will be used for sensitivity test. Only can be used when original_dataset is given.
         noisy_channel = False # If True, the demonstration set will be generated by a noisy channel model.
     ):
-        super().__init__(triplet_dataset, original_dataset, k, sensitivity_test, metrics, repeat_times, dividing, noisy_channel)
+        super().__init__(
+            triplet_dataset = triplet_dataset, 
+            original_dataset = original_dataset, 
+            k = k, 
+            sensitivity_test = sensitivity_test, 
+            metrics = metrics, 
+            repeat_times = repeat_times, 
+            dividing = dividing, 
+            noisy_channel = noisy_channel
+        )
         if sensitivity_test < 2:
             raise ValueError("The sensitivity test should be larger than 1.")
         self.current_error_rate = 0
@@ -454,7 +483,7 @@ class GLER_experimentor(sensitivity_experimentor):
     ):
         result_dicts = {}
         sensitivity_dict = {}
-        intermidiate_results = self.inference_run(forward_inference, batched_inference)
+        intermidiate_results = self.inference_run(forward_inference = forward_inference, batched_inference = batched_inference)
         arguments = [1]
         for i in range(1, self.test_times):
             arguments.append(arguments[-1] - i / (self.test_times - 1))
@@ -482,7 +511,14 @@ class template_sensitivity_experimentor(sensitivity_experimentor):
         dividing = [configs.STANDARD_SETTINGS["calibration_number"], configs.STANDARD_SETTINGS["demonstration_number"], 100], # A list of integers that divides the test samples into 4 splits. The first split will be used for calibration, the second split will be used for demonstration, the third split will be used for testing, and the fourth split will be used for sensitivity test. Only can be used when original_dataset is given.
         orthogonal_table = configs.STANDARD_SETTINGS["L9(3,4)_orthogonal_table"]
     ):
-        super().__init__(triplet_dataset = triplet_dataset, original_dataset=original_dataset, k=k, metrics=metrics, repeat_times=repeat_times, dividing=dividing, sensitivity_test=len(orthogonal_table))
+        super().__init__(
+            triplet_dataset = triplet_dataset, 
+            original_dataset=original_dataset, 
+            k=k, metrics=metrics, 
+            repeat_times=repeat_times, 
+            dividing=dividing, 
+            sensitivity_test=len(orthogonal_table)
+        )
         self.current_try = 0
         self.orthogonal_table = orthogonal_table
         self.alternate_template = self.triplet_dataset.get_alternate_template()
@@ -519,7 +555,6 @@ class template_sensitivity_experimentor(sensitivity_experimentor):
         return result_dicts, True
     
 
-# Untested, 2024/12/13
 class demonstration_sensitivity_experimentor(sensitivity_experimentor):
     def __init__(self, 
         triplet_dataset = None, 

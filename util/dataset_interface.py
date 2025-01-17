@@ -94,7 +94,7 @@ class triplet_dataset():
             raise ValueError("Index out of range.")
         return self.test.get_label(index)
     
-    def get_default_ground_truth_label_from_index(self, index) -> int:
+    def get_default_ground_truth_label_index(self, index) -> int:
         if index < 0 or index >= len(self.test):
             raise ValueError("Index out of range.")
         return self.test.find_index_from_label(self.get_default_ground_truth_label(index))
@@ -186,7 +186,7 @@ class demonstration_sampler():
         return len(self._sampled_indexes)
     
     def __getitem__(self, index: int) -> list[int]:
-        return self._sampled_indexes[index]
+        return self.get_sampled_indexes(index)
     
     def __str__(self) -> str:
         return (
@@ -228,7 +228,7 @@ class demonstration_sampler():
     def get_sampled_indexes(self, index) -> list[int]:
         if index < 0 or index >= self._query_numbers:
             raise ValueError("Index out of range.")
-        return self._sampled_indexes[index]
+        return copy.deepcopy(self._sampled_indexes[index])
 
 
 class prompt_writter():
@@ -241,6 +241,7 @@ class prompt_writter():
             __init__:
                 - triplet_dataset: triplet_dataset; the triplet dataset.
                 - use_noisy_channel: bool; whether to use the noisy channel mode (with a prompt like <label><text><label><text>...).
+                - pseudo_query_generater: None or callable; the pseudo query generater (with next() available) for some special usage (such as Contextual Calibration). If None, the pseudo query will not be used.
             prompt_writter.reset(): None; set the prompt writter to the default template defined by the original dataset (`triplet_dataset`).
             prompt_writter.use_noisy_channel(new_label_affix = " ", new_last_input_affix = "\n"): None; set the prompt writter to the noisy channel mode. The label affix and the last_input_affix can be changed.
             prompt_writter.get_label_of_test_samples(query_index: int): str; get the label word of the `index`-th examples defined by the `hgf_dataset_loader.basic_datasets_loader` of the test set.
@@ -253,8 +254,8 @@ class prompt_writter():
                 prompt_writter.change_query_prefix(query_prefix: str): None; change the query prefix of the prompt writter into the `query_prefix`.
                 prompt_writter.change_label_space(label_space: list[str]): None; change the label space of the prompt writter into the `label_space`.
             write_prompt(demos_indexes: list[int], query_index: int): str; write the prompt for the `demos_indexes`-th demonstrations and the `query_index`-th examples of the test set.
-                  Prompt will be structured as: 
-                  <prompt_writter.instruction> (notice that all the \n here are not default, you should add it if you want to split the instruction and the following input texts)
+                  Prompt will be structured as: (notice that all the \n here are not default, you should add it if you want to split the instruction and the following input texts)
+                  <prompt_writter.instruction> 
                   [ (for multiple-input tasks)
                     <prompt_writter.input_text_prefixes[0]> <prompt_writter.triplet_dataset.demonstration.get_input_text(index)[0]> <prompt_writter.input_text_prefixes[0]>
                     <prompt_writter.input_text_prefixes[1]> <prompt_writter.triplet_dataset.demonstration.get_input_text(index)[1]> <prompt_writter.input_text_prefixes[1]>
@@ -268,6 +269,23 @@ class prompt_writter():
                     ...
                     <prompt_writter.label_prefix> [MASKED]
                   ]
+
+                  while, if the `use_noisy_channel` is True, we return a list of prompts w.r.t. various labels (label_iter), and each prompt will be structured as:
+                  <prompt_writter.instruction> 
+                  [ (for multiple-input tasks)
+                    <prompt_writter.label_prefix> <prompt_writter.label(index)> <prompt_writter.label_afffix>
+                    <prompt_writter.input_text_prefixes[0]> <prompt_writter.triplet_dataset.demonstration.get_input_text(index)[0]> <prompt_writter.input_text_prefixes[0]>
+                    <prompt_writter.input_text_prefixes[1]> <prompt_writter.triplet_dataset.demonstration.get_input_text(index)[1]> <prompt_writter.input_text_prefixes[1]>
+                    ...
+                  ] * k (k = demostration numbers)
+                  <prompt_writter.label_prefix> <prompt_writter.label_iter> <prompt_writter.label_afffix>
+                  <prompt_writter.query_prefix>
+                  [ (for multiple-input tasks)
+                    <prompt_writter.input_text_prefixes[0]> <prompt_writter.triplet_dataset.test.get_input_text(index)[0]> <prompt_writter.input_text_prefixes[0]>
+                    <prompt_writter.input_text_prefixes[1]> <prompt_writter.triplet_dataset.test.get_input_text(index)[1]> <prompt_writter.input_text_prefixes[1]>
+                    ...
+                  ]
+
             write_prompt_from_dataline(demos_lines: list[(list[str], str)], query_line: list[str]): str; write the prompt for the `demos_lines`-th demonstrations and the `query_line`-th examples of the test set.
               e.g., the demos_lines can be [(["thoughtful , provocative and entertaining ."], "positive"), (["don't be fooled by the impressive cast list - eye see you is pure junk ."], "negative")], and the query_line can be [""].
               (Notice that in this library, a input text is a list of strings to suite our library towards the multi-input tasks.)
@@ -376,16 +394,16 @@ class prompt_writter():
             else:
                 self.reset()
     
-    def get_label_of_test_samples(self, query_index: int):
-        if query_index < 0 or query_index >= len(self._triplet_dataset.test):
-            raise ValueError("Index out of range.")
-        return self._triplet_dataset.test.get_label(query_index)
+    # def get_label_of_test_samples(self, query_index: int):
+    #     if query_index < 0 or query_index >= len(self._triplet_dataset.test):
+    #         raise ValueError("Index out of range.")
+    #     return self._triplet_dataset.test.get_label(query_index)
 
     def change_instruction(self, instruction: str):
         warnings.warn(configs.WARNING_SETTINGS["tampering"])
         if type(instruction) is not str:
             raise ValueError("Instruction should be a string.")
-        self._instruction = instruction
+        self._instruction = copy.deepcopy(instruction)
 
     def change_input_text_prefixes(self, input_text_prefixes: list[str]):
         warnings.warn(configs.WARNING_SETTINGS["tampering"])
@@ -394,7 +412,7 @@ class prompt_writter():
         for prefix in input_text_prefixes:
             if type(prefix) is not str:
                 raise ValueError("Input text prefixes should be a list of strings.")
-        self._input_text_prefixes = input_text_prefixes
+        self._input_text_prefixes = copy.deepcopy(input_text_prefixes)
     
     def change_input_text_affixes(self, input_text_affixes: list[str]):
         warnings.warn(configs.WARNING_SETTINGS["tampering"])
@@ -405,25 +423,25 @@ class prompt_writter():
                 raise ValueError("Input text affixes should be a list of strings.")
         if len(input_text_affixes) != self.input_element_numbers:
             raise ValueError("The number of input text affixes should be equal to the number of input elements.")
-        self._input_text_affixes = input_text_affixes
+        self._input_text_affixes = copy.deepcopy(input_text_affixes)
     
     def change_label_prefix(self, label_prefix: str):
         warnings.warn(configs.WARNING_SETTINGS["tampering"])
         if type(label_prefix) is not str:
             raise ValueError("Label prefix should be a string.")
-        self._label_prefix = label_prefix
+        self._label_prefix = copy.deepcopy(label_prefix)
     
     def change_label_affix(self, label_affix: str):
         warnings.warn(configs.WARNING_SETTINGS["tampering"])
         if type(label_affix) is not str:
             raise ValueError("Label affix should be a string.")
-        self._label_affix = label_affix
+        self._label_affix = copy.deepcopy(label_affix)
     
     def change_query_prefix(self, query_prefix: str):
         warnings.warn(configs.WARNING_SETTINGS["tampering"])
         if type(query_prefix) is not str:
             raise ValueError("Query prefix should be a string.")
-        self._query_prefix = query_prefix
+        self._query_prefix = copy.deepcopy(query_prefix)
 
     def change_label_space(self, label_space: list[str]):
         warnings.warn(configs.WARNING_SETTINGS["tampering"])
@@ -432,7 +450,7 @@ class prompt_writter():
         for label in label_space:
             if type(label) is not str:
                 raise ValueError("Label space should be a list of strings.")
-        self._label_space = label_space
+        self._label_space = copy.deepcopy(label_space)
 
     def get_label_space(self):
         # Return a deep copy of the label space.
@@ -447,12 +465,14 @@ class prompt_writter():
         self.change_label_prefix(self._label_prefix[:-1])
         self.change_label_space(new_label_space)
     
-    def write_prompt(self, demos_indexes: list[int], query_index: int):
+    def write_prompt(self, demos_indexes: list[int], query_index: int = None):
         # Use the indexes of the demonstrations and the query to write a prompt.
         # demos_indexes: [demo1, demo2, ..., demok]
         # query_index: query
         if self.label_wrong_rate < 0 or self.label_wrong_rate > 1:
             raise ValueError("The label wrong rate should be in [0, 1].")
+        if query_index is None and not self.pseudo_prompt:
+            raise ValueError("The query index should be given. If you want to use the pseudo query, please set the pseudo query generater.")
         wrong_label_number = int(len(demos_indexes) * self.label_wrong_rate)
         if wrong_label_number != 0 and wrong_label_number / len(demos_indexes) != self.label_wrong_rate:
             warnings.warn("The number of wrong labels is not an integer.")
@@ -490,9 +510,7 @@ class prompt_writter():
             ) for a k = 2 scenario.
             And the output is: "review: thoughtful , provocative and entertaining . sentiment: positive\nreview: don't be fooled by the impressive cast list - eye see you is pure junk . sentiment: negative\nreview:  sentiment: "
             demos_line: [(<demo1> [input1, input2, ...], label_word), (<demo2> [input1, input2, ...], label_word), ..., (<demok> [input1, input2, ...], label_word)]
-            query_line: [input1, input2, ...
-            NOISY CHANNEL
-            https://arxiv.org/abs/2108.04106
+            query_line: [input1, input2, ...]
             Return: List[str]: prompts for every label token.
         """
 

@@ -8,14 +8,13 @@ This is a standardized toolkit for in-context classification by Hakaze Cho (Yufe
 2. [Introduction](#introduction)
 3. [Quick Start](#quick-start)
 4. [Custom Experiment](#custom-experiment)
-5. [Sub-benchmarks](#sub-benchmarks)
-6. [Detailed Documentation](#detailed-documentation)
+5. [Detailed Documentation](#detailed-documentation)
 
 ## Installation
 
 We ensure that under normal usage, this library only relies on Python's default dependency libraries.
 
-You can only download a release pack of StaICC and unfold it into your work path with the top folder `StaICC` in your work path, like:
+You need only to download a release pack of StaICC and unfold it into your work path with the top folder `StaICC` in your work path, like:
 
 ```
 --- work_path
@@ -50,6 +49,7 @@ to install this library. -->
 | StaICC-Diagnosis: Bias | `from StaICC import Triplet_bias` | A prediction logits bias (3 types) detector. |
 | StaICC-Diagnosis: Noise Sensitivity | `from StaICC import GLER` | A demonstration label noise sensitivity detector. |
 | StaICC-Diagnosis: Template Sensitivity | `from StaICC import Template_sens` | A template sensitivity detector against 9 prompt templates. |
+| StaICC-Diagnosis: Demonstration Sensitivity| `from StaICC import Demo_sens` | A demonstration sensitivity detector against the given demonstraions in the context. |
 
 #### StaICC-Normal
 
@@ -63,7 +63,7 @@ to install this library. -->
 
 2. **Domainal Bias**: Introduced by [Mitigating Label Biases for In-context Learning](http://arxiv.org/abs/2305.19148), domainal bias measures the bias when some demonstrations and a query of randomly sampled tokens from the test dataset is fed into the model. We use the entropy of the averaged prediction probabilites as the metric.
 
-3. **Posterior Bias**: Measures the bias from the predicted probability to the frequency of the ground-truth label.
+3. **Posterior Bias**: Measures the bias (we use DL divergence for the metric) from the predicted probability to the frequency of the ground-truth label.
 
 You can use them dividedly by `from StaICC import Contextual_bias, Domain_bias, Post_bias`.
 
@@ -74,6 +74,10 @@ You can use them dividedly by `from StaICC import Contextual_bias, Domain_bias, 
 #### StaICC-Diagnosis: Template Sensitivity
 
 `StaICC-Diagnosis: Template Sensitivity` is a template sensitivity detector against 9 prompt templates. It uses the prediction consistency as a negative metric to the sensitivity: for one set of demonstraions and query, we make up 9 prompts with different templates, and calculate the prediction consistency of the model. Lower prediction consistency indicates higher template sensitivity.
+
+#### StaICC-Diagnosis: Demonstration Sensitivity
+
+`StaICC-Diagnosis: Demonstration Sensitivity` is a demonstration sensitivity detector against 8 demonstraions sets for each query. It uses the prediction consistency as a negative metric to the sensitivity: for one query, we make up 8 prompts with different set of demonstraions, and calculate the prediction consistency of the model. Lower prediction consistency indicates higher template sensitivity.
 
 ### Datasets
 
@@ -90,7 +94,7 @@ In StaICC, we use the following original datasets:
 |6|Subjective | Subjectivity Classification | objective, subjective|https://dl.acm.org/doi/10.5555/2390665.2390688|
 |7|Tweet Eval Emotion | Sentiment Classification | anger, joy, optimism, sadness|https://aclanthology.org/S18-1001/|
 |8|Tweet Eval Hate |Hate Speech Classification | non-hate, hate|https://aclanthology.org/S19-2007/|
-|9|Hate Speech 18|Hate Speech Classification| noHate, hate, idk/skip, relation| - |
+|9|Hate Speech 18|Hate Speech Classification| noHate, hate, idk/skip, relation| https://huggingface.co/datasets/odegiber/hate_speech18 |
 
 ## Quick Start
 
@@ -340,7 +344,30 @@ You can train a calibration function above the normal output of LMs, by the rema
 
 #### Noisy Channel Inference
 
-Noisy Channel use a resevered prompt like `<label><input_text><label><input_text>...` as the input. Refer to [Noisy Channel Language Model Prompting for Few-Shot Text Classification](https://aclanthology.org/2022.acl-long.365/) for details. To use this inference, you should set the `noisy_channel = True` when you load the benchmark. For example,
+Noisy Channel use a resevered prompt like `<label><input_text><label><input_text>...` as the input. 
+
+Simply, noisy channel inference is a method to build a reversed prompt for each label candidate like:
+
+```
+<prompt_writter.instruction> 
+[ (for multiple-input tasks)
+  <prompt_writter.label_prefix> <prompt_writter.label(index)> <prompt_writter.label_afffix>
+  <prompt_writter.input_text_prefixes[0]> <prompt_writter.triplet_dataset.demonstration.get_input_text(index)[0]> <prompt_writter.input_text_prefixes[0]>
+  <prompt_writter.input_text_prefixes[1]> <prompt_writter.triplet_dataset.demonstration.get_input_text(index)[1]> <prompt_writter.input_text_prefixes[1]>
+  ...
+] * k (k = demostration numbers)
+<prompt_writter.label_prefix> <prompt_writter.label_iter> <prompt_writter.label_afffix>
+<prompt_writter.query_prefix>
+[ (for multiple-input tasks)
+  <prompt_writter.input_text_prefixes[0]> <prompt_writter.triplet_dataset.test.get_input_text(index)[0]> <prompt_writter.input_text_prefixes[0]>
+  <prompt_writter.input_text_prefixes[1]> <prompt_writter.triplet_dataset.test.get_input_text(index)[1]> <prompt_writter.input_text_prefixes[1]>
+  ...
+]
+```
+
+Refer to [Noisy Channel Language Model Prompting for Few-Shot Text Classification](https://aclanthology.org/2022.acl-long.365/) for details. 
+
+To use this inference, you should set the `noisy_channel = True` when you load the benchmark. For example,
 
 ```python
 from StaICC import Normal
@@ -364,7 +391,9 @@ More examples are shown in the `examples` folder.
 
 You can simply set the `return_outputs=True` in the `auto_run` function to return the direct outputs of the inference function, then conduct your own metric calculation. Or, you can add your metric, which should be shaped like `metric(ground_truth: list[int], prediction: list[list[float]]) -> float`, by the `experimentor.add_metric(name: str, metric: Callable[ground_truth: list[int], prediction: list[list[float]]])` function.
 
-## Sub-benchmarks
+**Tips**
+
+- You should not customlize your metric on the StaICC-Diagnosis benchmarks, the metrics here should be predefined.
 
 ## Detailed Documentation
 
@@ -385,9 +414,83 @@ Get the input texts (notice that for multi-input task, the input texts can be mu
 
 Transfer label index to label text.
 
+#### `split(split_indexes: list[list[int]]) -> list[basic_datasets_loader]`
+
+Given the list of indexes list of the splits, return the list of `basic_datasets_loader` objects of the splits.
+
+Control the split numbers by the `len(split_indexes)`, and control the split size by the `len(split_indexes[i])`, and enumerate the element index in each split by the `split_indexes[i][j]`.
+
+### `triplet_dataset` class
+
+The `triplet_dataset` class is a class to load the dataset and divide it into demonstraion set, calibration set and test set. `triplet_dataset` divide one `basic_datasets_loader` object into three parts: `demonstration_set`, `calibration_set`, and `test_set`, all the 3 are new `basic_datasets_loader` return from `basic_datasets_loader.split()`.
+
+Also, this class should be hide from the users.
+
 ### `demonstration_sampler` class
 
-### `prompt_former` class
+The `demonstration_sampler` class is a `list[list[int]]`-like class with stable random sampling to control the demonstration sampling process. Typically, for each query indexed with `i`, the `demonstration_sampler[i]: list[int]` is a list of indices of the demonstrations sequence assigned for the corresponding test sample.
+
+Also, you should not access this class directly. If you want to set your own sample list, you should use the `experimentor.set_demonstration_sampler` to set a `list[list[int]]`-like object to the experimentor.
+
+### `prompt_writter` class
+
+As described in [Custom Experiment](#custom-experiment), the `prompt_writter` class is a class to control the prompt template. You can access the `prompt_writter` object by the `experimentor.prompt_former`. The `prompt_writter` object has the following members to control the prompt template:
+
+#### `reset() -> None`
+
+Reset the `prompt_writter` settings to default.
+
+#### `set_label_wrong_rate(rate: float) -> None`
+
+Set the rate of the wrong label in the demonstrations. The parameter `rate` is a `float` object, and should be in the range of `[0, 1]`. `0` means no wrong label, and `1` means all the labels are wrong.
+
+#### `use_noisy_channel() -> None`
+
+Enable the noisy channel prompting. Do not use this function if you do not know what it is. If you want to use the noisy channel inference, you should set the `noisy_channel = True` when you load the benchmark. See [Custom Experiment](#custom-experiment) for details.
+
+Notice that this function will reload the `label_afffix` and `input_text_affixes[-1]` to the noisy channel format, since the major spiltor between the demonstrations in the noisy channel mode is the `input_text_affixes[-1]`, instead the `label_afffix`.
+
+#### `cancel_noisy_channel() -> None`
+
+Disable the noisy channel prompting.
+
+#### `get_config_dict() -> dict`; `set_config_dict(config_dict: dict) -> None`
+
+For convenience's sake, you can set the prompt template by the `set_config_dict(config_dict)` function, and load the current setting by the `get_config_dict()` function. The dictionary have the following keys, but you only need to set the keys you want to change:
+
+``` python
+{
+    'instruction': str,
+    'input_text_prefixes': list[str],
+    'input_text_affixes': list[str],
+    'label_prefix': str,
+    'label_affix': str,
+    'query_prefix': str,
+    'label_space': list[str],
+    'label_wrong_rate': float,
+    'use_noisy_channel': bool
+}
+```
+
+While, you can also use the individual functions to set the prompt template as described in [Custom Experiment](#custom-experiment).
+
+#### `replace_space_to_label(label: str) -> str`
+
+In some cases, you may want to use label space like `[' positive', ' negative']` with a space in the head, instead of `['positive', 'negative']`, since some tokenizer may treat them differently, and the `label_space` here will be fed into the inference function defaultly. You can use this function to replace the space in the tail of `label_prefix` to the head of `label_space`.
+
+Notice that use this function will firstly reset the prompt template to the default. You should not use this function if you do not know what it is.
+
+#### `write_prompt(demos_indexes, query_index) -> str`
+
+Access the `triplet_dataset`, fetch the required demonstrations and query in the parameters, and write the prompt. The `demos_indexes` is a sequence of indices of the demonstrations assigned for the corresponding test sample, and the `query_index` is the index of the test sample.
+
+The `query_index` can be a `None` when `self.pseudo_prompt` is defined, to produce a prompt with a pseudo query.
+
+#### `write_prompt_from_dataline(demos_lines: list[(list[str], str)], query_line: list[str], cut_by_length = 0) -> str`
+
+Write the prompt from the data (string). The `demos_lines` is a list of the demonstrations strings, formatted as `[(demonstration inputs: list[str], label: str) * k]` and the `query_line` is the query. Notice that we support the multi-input task, so the input text object is `list[str]`. The `cut_by_length` is a `int` object to cut the prompt by the string length.
+
+**Experimenor and Benchmark**
 
 ### `single_experimentor` class
 
@@ -463,3 +566,5 @@ The return value is a 2- or 3-turple, as: `(result_dictionary, success_indicator
     - `expected_calibration_error_1`: The expected calibration error of the prediction. Only effective when the predicted probability is returned as the prediction.
 - `success_indicator`: A boolean value to indicate whether the experiment is successful. If the experiment is successful, the value is `True`, otherwise, the value is `False`.
 - `direct_outputs`: The direct outputs of the inference function. Only returned when `return_outputs=True`. Formatted as a dictionary with keys: `ground_truth, predictions, predicted_probabilities`.
+
+### `single_experimentor` class
