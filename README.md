@@ -25,15 +25,13 @@ You need only to download a release pack of StaICC and unfold it into your work 
  |--- ...
 ```
 
-We will provide a PyPl package `StaICC` in the future.
-
-<!-- Also, we release PyPl package `StaICC`. You can use:
+Also, we release PyPl package `StaICC`. You can use:
 
 ```
 pip install StaICC
 ```
 
-to install this library. -->
+to install this library.
 
 ## Introduction
 
@@ -566,5 +564,3 @@ The return value is a 2- or 3-turple, as: `(result_dictionary, success_indicator
     - `expected_calibration_error_1`: The expected calibration error of the prediction. Only effective when the predicted probability is returned as the prediction.
 - `success_indicator`: A boolean value to indicate whether the experiment is successful. If the experiment is successful, the value is `True`, otherwise, the value is `False`.
 - `direct_outputs`: The direct outputs of the inference function. Only returned when `return_outputs=True`. Formatted as a dictionary with keys: `ground_truth, predictions, predicted_probabilities`.
-
-### `single_experimentor` class
