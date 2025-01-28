@@ -1,6 +1,13 @@
 # StaICC: Standardized Toolkit for In-context Classification
 
-This is a standardized toolkit for in-context classification by Hakaze Cho (Yufeng Zhao).
+<p align="center">
+  <a href="https://www.hakaze-c.com/">Hakaze Cho</a>, et al.
+  <br>
+  <a href="https://github.com/hc495/StaICC/blob/master/LICENSE"><img alt="Static Badge" src="https://img.shields.io/badge/license-Apache--2.0-yellow?style=flat"></a>
+  <a href="https://arxiv.org/abs/2501.15708"><img alt="Static Badge" src="https://img.shields.io/badge/arXiv-2501.15708-red?style=flat&link=https%3A%2F%2Farxiv.org%2Fabs%2F2501.15708"></a>
+</p>
+
+This is a standardized toolkit for in-context classification by Hakaze Cho (Yufeng Zhao), descirbed in paper [StaICC: Standardized Evaluation for Classification Task in In-context Learning](https://arxiv.org/abs/2501.15708).
 
 ## Content
 
@@ -564,3 +571,16 @@ The return value is a 2- or 3-turple, as: `(result_dictionary, success_indicator
     - `expected_calibration_error_1`: The expected calibration error of the prediction. Only effective when the predicted probability is returned as the prediction.
 - `success_indicator`: A boolean value to indicate whether the experiment is successful. If the experiment is successful, the value is `True`, otherwise, the value is `False`.
 - `direct_outputs`: The direct outputs of the inference function. Only returned when `return_outputs=True`. Formatted as a dictionary with keys: `ground_truth, predictions, predicted_probabilities`.
+
+## Citation
+
+If you find this work useful for your research, please cite [our paper](https://arxiv.org/abs/2501.15708):
+
+```
+@article{cho2025staicc,
+  title={StaICC: Standardized Evaluation for Classification Task in In-context Learning},
+  author={Cho, Hakaze and Inoue, Naoya},
+  journal={arXiv preprint arXiv:2501.15708},
+  year={2025}
+}
+```
