@@ -3,6 +3,7 @@
 <p align="center">
   <a href="https://www.hakaze-c.com/">Hakaze Cho</a>, et al.
   <br>
+  <br>
   <a href="https://github.com/hc495/StaICC/blob/master/LICENSE"><img alt="Static Badge" src="https://img.shields.io/badge/license-Apache--2.0-yellow?style=flat"></a>
   <a href="https://arxiv.org/abs/2501.15708"><img alt="Static Badge" src="https://img.shields.io/badge/arXiv-2501.15708-red?style=flat&link=https%3A%2F%2Farxiv.org%2Fabs%2F2501.15708"></a>
 </p>
