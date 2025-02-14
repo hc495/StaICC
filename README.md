@@ -585,3 +585,152 @@ If you find this work useful for your research, please cite [our paper](https://
   year={2025}
 }
 ```
+
+Also, please cite all the original paper of the datasets used in this work.
+
+```
+@inproceedings{SST2andSST5,
+  address = {Seattle, Washington, USA},
+  author = {Socher, Richard  and
+    Perelygin, Alex  and
+    Wu, Jean  and
+    Chuang, Jason  and
+    Manning, Christopher D.  and
+    Ng, Andrew  and
+    Potts, Christopher},
+  booktitle = {Proceedings of the 2013 Conference on Empirical Methods in Natural Language Processing},
+  month = {October},
+  pages = {1631--1642},
+  publisher = {Association for Computational Linguistics},
+  title = {Recursive Deep Models for Semantic Compositionality Over a Sentiment Treebank},
+  url = {https://www.aclweb.org/anthology/D13-1170},
+  year = {2013}
+}
+
+@inproceedings{MR,
+  author = {Pang, Bo and Lee, Lillian},
+  booktitle = {Proceedings of the 43rd Annual Meeting of the Association for Computational Linguistics (ACL¡¯05)},
+  pages = {115--124},
+  title = {Seeing Stars: Exploiting Class Relationships for Sentiment Categorization with Respect to Rating Scales},
+  url = {http://arxiv.org/abs/cs/0506075v1},
+  year = {2005}
+}
+
+@article{FP,
+  author = {P. Malo and A. Sinha and P. Korhonen and J. Wallenius and P. Takala},
+  journal = {Journal of the Association for Information Science and Technology},
+  title = {Good debt or bad debt: Detecting semantic orientations in economic texts},
+  url = {http://arxiv.org/abs/1307.5336v2},
+  volume = {65},
+  year = {2014}
+}
+
+@inproceedings{TREC1,
+  author = {Li, Xin  and  Roth, Dan},
+  booktitle = {{COLING} 2002: The 19th International Conference on Computational Linguistics},
+  title = {Learning Question Classifiers},
+  url = {https://www.aclweb.org/anthology/C02-1150},
+  year = {2002}
+}
+
+@inproceedings{trec2,
+  author = {Hovy, Eduard  and
+    Gerber, Laurie  and
+    Hermjakob, Ulf  and
+    Lin, Chin-Yew  and
+    Ravichandran, Deepak},
+  booktitle = {Proceedings of the First International Conference on Human Language Technology Research},
+  title = {Toward Semantics-Based Answer Pinpointing},
+  url = {https://www.aclweb.org/anthology/H01-1069},
+  year = {2001}
+}
+
+@inproceedings{AGNews,
+  author = {Xiang Zhang and Junbo Jake Zhao and Yann LeCun},
+  booktitle = {NIPS},
+  title = {Character-level Convolutional Networks for Text Classification},
+  url = {https://www.semanticscholar.org/paper/51a55df1f023571a7e07e338ee45a3e3d66ef73e},
+  year = {2015}
+}
+
+@inproceedings{subjective,
+  abstract = {Variants of Naive Bayes (NB) and Support Vector Machines (SVM) are often used as baseline methods for text classification, but their performance varies greatly depending on the model variant, features used and task/dataset. We show that: (i) the inclusion of word bigram features gives consistent gains on sentiment analysis tasks; (ii) for short snippet sentiment tasks, NB actually does better than SVMs (while for longer documents the opposite result holds); (iii) a simple but novel SVM variant using NB log-count ratios as feature values consistently performs well across tasks and datasets. Based on these observations, we identify simple NB and SVM variants which outperform most published results on sentiment analysis datasets, sometimes providing a new state-of-the-art performance level.},
+  address = {USA},
+  author = {Wang, Sida and Manning, Christopher D.},
+  booktitle = {Proceedings of the 50th Annual Meeting of the Association for Computational Linguistics: Short Papers - Volume 2},
+  location = {Jeju Island, Korea},
+  numpages = {5},
+  pages = {90¨C94},
+  publisher = {Association for Computational Linguistics},
+  series = {ACL '12},
+  title = {Baselines and bigrams: simple, good sentiment and topic classification},
+  url = {https://www.semanticscholar.org/paper/5e9fa46f231c59e6573f9a116f77f53703347659},
+  year = {2012}
+}
+
+@inproceedings{TEE,
+  abstract = {We present the SemEval-2018 Task 1: Affect in Tweets, which includes an array of subtasks on inferring the affectual state of a person from their tweet. For each task, we created labeled data from English, Arabic, and Spanish tweets. The individual tasks are: 1. emotion intensity regression, 2. emotion intensity ordinal classification, 3. valence (sentiment) regression, 4. valence ordinal classification, and 5. emotion classification. Seventy-five teams (about 200 team members) participated in the shared task. We summarize the methods, resources, and tools used by the participating teams, with a focus on the techniques and resources that are particularly useful. We also analyze systems for consistent bias towards a particular race or gender. The data is made freely available to further improve our understanding of how people convey emotions through language.},
+  address = {New Orleans, Louisiana},
+  author = {Mohammad, Saif  and
+    Bravo-Marquez, Felipe  and
+    Salameh, Mohammad  and
+    Kiritchenko, Svetlana},
+  booktitle = {Proceedings of the 12th International Workshop on Semantic Evaluation},
+  doi = {10.18653/v1/S18-1001},
+  editor = {Apidianaki, Marianna  and
+    Mohammad, Saif M.  and
+    May, Jonathan  and
+    Shutova, Ekaterina  and
+    Bethard, Steven  and
+    Carpuat, Marine},
+  month = {June},
+  pages = {1--17},
+  publisher = {Association for Computational Linguistics},
+  title = {{S}em{E}val-2018 Task 1: Affect in Tweets},
+  url = {https://aclanthology.org/S18-1001/},
+  year = {2018}
+}
+
+@inproceedings{TEH,
+  abstract = {The paper describes the organization of the SemEval 2019 Task 5 about the detection of hate speech against immigrants and women in Spanish and English messages extracted from Twitter. The task is organized in two related classification subtasks: a main binary subtask for detecting the presence of hate speech, and a finer-grained one devoted to identifying further features in hateful contents such as the aggressive attitude and the target harassed, to distinguish if the incitement is against an individual rather than a group. HatEval has been one of the most popular tasks in SemEval-2019 with a total of 108 submitted runs for Subtask A and 70 runs for Subtask B, from a total of 74 different teams. Data provided for the task are described by showing how they have been collected and annotated. Moreover, the paper provides an analysis and discussion about the participant systems and the results they achieved in both subtasks.},
+  address = {Minneapolis, Minnesota, USA},
+  author = {Basile, Valerio  and
+    Bosco, Cristina  and
+    Fersini, Elisabetta  and
+    Nozza, Debora  and
+    Patti, Viviana  and
+    Rangel Pardo, Francisco Manuel  and
+    Rosso, Paolo  and
+    Sanguinetti, Manuela},
+  booktitle = {Proceedings of the 13th International Workshop on Semantic Evaluation},
+  doi = {10.18653/v1/S19-2007},
+  editor = {May, Jonathan  and
+    Shutova, Ekaterina  and
+    Herbelot, Aurelie  and
+    Zhu, Xiaodan  and
+    Apidianaki, Marianna  and
+    Mohammad, Saif M.},
+  month = {June},
+  pages = {54--63},
+  publisher = {Association for Computational Linguistics},
+  title = {{S}em{E}val-2019 Task 5: Multilingual Detection of Hate Speech Against Immigrants and Women in {T}witter},
+  url = {https://aclanthology.org/S19-2007/},
+  year = {2019}
+}
+
+@inproceedings{hate_speech_18,
+  address = {Brussels, Belgium},
+  author = {de Gibert, Ona  and
+    Perez, Naiara  and
+    Garc{\'\i}a-Pablos, Aitor  and
+    Cuadros, Montse},
+  booktitle = {Proceedings of the 2nd Workshop on Abusive Language Online ({ALW}2)},
+  doi = {10.18653/v1/W18-5102},
+  month = {October},
+  pages = {11--20},
+  publisher = {Association for Computational Linguistics},
+  title = {{Hate Speech Dataset from a White Supremacy Forum}},
+  url = {https://www.aclweb.org/anthology/W18-5102},
+  year = {2018}
+}
+```
