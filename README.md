@@ -633,7 +633,7 @@ Also, please cite all the original paper of the datasets used in this work.
   year = {2002}
 }
 
-@inproceedings{trec2,
+@inproceedings{TREC2,
   author = {Hovy, Eduard  and
     Gerber, Laurie  and
     Hermjakob, Ulf  and
