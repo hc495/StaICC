@@ -609,7 +609,7 @@ Also, please cite all the original paper of the datasets used in this work.
 
 @inproceedings{MR,
   author = {Pang, Bo and Lee, Lillian},
-  booktitle = {Proceedings of the 43rd Annual Meeting of the Association for Computational Linguistics (ACL¡¯05)},
+  booktitle = {Proceedings of the 43rd Annual Meeting of the Association for Computational Linguistics (ACL'05)},
   pages = {115--124},
   title = {Seeing Stars: Exploiting Class Relationships for Sentiment Categorization with Respect to Rating Scales},
   url = {http://arxiv.org/abs/cs/0506075v1},
